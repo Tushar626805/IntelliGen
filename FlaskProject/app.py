@@ -1,5 +1,5 @@
 """
-IntelliGen AI service (Flask + Ollama).
+IntelliGen AI service (Flask + Gemini).
 
 Pipeline: PDF text -> page-aware chunks (spread over the whole document) -> LLM draft questions ->
 automatic checks (answer resolution, option quality, duplicates, text-overlap with the source) ->
@@ -25,18 +25,20 @@ import time
 import traceback
 import uuid
 
-import ollama
+from google import genai
 from flask import Flask, jsonify, request
 
 app = Flask(__name__)
 
 # ---------------------------------------------------------------- configuration
-MODEL = os.environ.get('IGEN_MODEL', 'llama3:8b')
-# Ollama's own default context is small (2048 tokens) and silently cuts long prompts.
-NUM_CTX = int(os.environ.get('IGEN_NUM_CTX', '4096'))
+MODEL = os.environ.get('IGEN_MODEL', 'gemini-2.5-flash')
 API_KEY = os.environ.get('IGEN_API_KEY', '')
-OLLAMA_HOST = os.environ.get('OLLAMA_HOST', 'http://localhost:11434')
-ollama_client = ollama.Client(host=OLLAMA_HOST)# optional shared secret with the Spring backend
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
+
+gemini_client = (
+    genai.Client(api_key=GEMINI_API_KEY)
+    if GEMINI_API_KEY else None
+)
 CHUNK_CHARS = int(os.environ.get('IGEN_CHUNK_CHARS', '5000'))
 MAX_CHUNKS = int(os.environ.get('IGEN_MAX_CHUNKS', '5'))
 MAX_QUESTIONS = 30
@@ -183,13 +185,23 @@ def parse_items(raw):
 
 
 def call_llm(chunk_text, count, difficulty, avoid=None):
-    response = ollama_client.chat(
+    if gemini_client is None:
+        raise RuntimeError("GEMINI_API_KEY is not configured")
+
+    response = gemini_client.models.generate_content(
         model=MODEL,
-        messages=[{'role': 'user', 'content': build_prompt(chunk_text, count, difficulty, avoid or [])}],
-        format='json',
-        options={'num_ctx': NUM_CTX, 'temperature': 0.4},
+        contents=build_prompt(chunk_text, count, difficulty, avoid or []),
+        config={
+            "response_mime_type": "application/json",
+            "temperature": 0.4,
+            "max_output_tokens": 8192
+        }
     )
-    return parse_items(response['message']['content'])
+
+    if not response.text:
+        raise RuntimeError("Gemini returned an empty response")
+
+    return parse_items(response.text)
 
 
 # ---------------------------------------------------------------- checks on each drafted question
@@ -457,8 +469,8 @@ def read_request(data):
 
 def friendly_error(exc):
     if isinstance(exc, (ConnectionError, OSError)) or 'connect' in str(exc).lower():
-        return 'The AI model is not reachable. Make sure Ollama is running and the model "%s" is installed.' % MODEL
-    return 'Question generation failed. Is Ollama running with the "%s" model?' % MODEL
+        return 'Gemini API is not reachable. Check your API key and internet connection.'
+    return 'Question generation failed. Please check the Gemini API response.'
 
 
 @app.before_request
