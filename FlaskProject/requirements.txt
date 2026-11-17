@@ -1,0 +1,13 @@
+flask
+spacy
+nltk
+sentence-transformers
+transformers
+torch
+accelerate
+packaging
+scikit-learn
+joblib
+ollama
+requests
+gunicorn

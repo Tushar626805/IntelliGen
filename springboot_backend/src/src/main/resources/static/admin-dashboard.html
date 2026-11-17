@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script src="api.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard | IntelliGen</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="theme.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="ui.js"></script>
+    <script src="notifications.js"></script>
+    <script src="layout.js"></script>
+    <script>
+        const u = JSON.parse(localStorage.getItem('currentUser'));
+        if (!u || u.role !== 'ADMIN') window.location.replace('login.html');
+    </script>
+</head>
+<body class="text-slate-800 antialiased">
+
+<main id="igContent">
+    <div id="view-approvals">
+        <div class="page-header">
+            <h1 class="page-title">Pending Approvals</h1>
+            <p class="page-sub">Principal registrations waiting for administrator approval.</p>
+        </div>
+        <div id="approvalsList" class="space-y-3"></div>
+    </div>
+
+    <div id="view-users" class="hidden">
+        <div class="page-header">
+            <h1 class="page-title">Account Access</h1>
+            <p class="page-sub">Suspend or restore sign-in access for staff and students.</p>
+        </div>
+        <div id="userList" class="space-y-3"></div>
+    </div>
+</main>
+
+<script>
+    IGLayout.mount({
+        role: 'Admin', contextId: 'adminContext',
+        nav: [
+            { id: 'tab-approvals', icon: 'fa-user-check', label: 'Pending Approvals', onclick: "switchTab('approvals')", active: true },
+            { id: 'tab-users', icon: 'fa-user-shield', label: 'Account Access', onclick: "switchTab('users')" }
+        ]
+    });
+    document.getElementById('adminContext').innerText = 'Superuser Access';
+</script>
+
+<script>
+    const esc = IGUI.esc;
+
+    function switchTab(tab) {
+        ['approvals', 'users'].forEach(t => {
+            const view = document.getElementById('view-' + t);
+            const btn = document.getElementById('tab-' + t);
+            if (t === tab) {
+                view.classList.remove('hidden');
+                btn.classList.replace('tab-inactive', 'tab-active');
+            } else {
+                view.classList.add('hidden');
+                btn.classList.replace('tab-active', 'tab-inactive');
+            }
+        });
+
+        if(tab === 'approvals') loadApprovals();
+        if(tab === 'users') loadUsers();
+    }
+
+    async function loadApprovals() {
+        const list = document.getElementById('approvalsList');
+        list.innerHTML = '<div class="skeleton" style="height:76px"></div>';
+        try {
+            const res = await fetch('/api/auth/admin/pending-principals');
+            const data = await res.json();
+
+            if (data.length === 0) {
+                list.innerHTML = IGUI.empty({ icon: 'fa-user-check', title: 'All Caught Up', text: 'No principal registrations are waiting for approval.' });
+                return;
+            }
+
+            list.innerHTML = data.map(p => `
+                <div class="ui-card flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4">
+                    <div class="min-w-0">
+                        <p class="font-semibold text-slate-900">${esc(p.name)} <span class="badge badge-amber ml-1">Pending Principal</span></p>
+                        <p class="text-sm text-slate-500 mt-1"><i class="fa-solid fa-building-columns mr-1"></i> ${esc(p.collegeName)} <span class="mx-1 text-slate-300">|</span> <i class="fa-solid fa-envelope mr-1"></i> ${esc(p.username)}</p>
+                    </div>
+                    <button onclick="approvePrincipal(${Number(p.id)})" class="btn btn-success shrink-0">
+                        <i class="fa-solid fa-check"></i> Approve Account
+                    </button>
+                </div>
+            `).join('');
+        } catch (e) {
+            list.innerHTML = IGUI.empty({ error: true, icon: 'fa-plug-circle-xmark', title: 'Could Not Load Approvals', text: 'Is the backend running?', retry: 'loadApprovals()' });
+        }
+    }
+
+    async function approvePrincipal(id) {
+        try {
+            const res = await fetch(`/api/auth/admin/approve-principal/${id}`, { method: 'PUT' });
+            IGUI.toast(res.ok ? 'Principal account approved.' : 'Failed to approve principal.', res.ok ? 'success' : 'error');
+            loadApprovals();
+        } catch (e) { alert("Failed to approve principal."); }
+    }
+
+    function userRow(name, active, metaHtml, fn, id) {
+        const badge = active ? '<span class="badge badge-green ml-1">Active</span>' : '<span class="badge badge-red ml-1">Suspended</span>';
+        const btn = active
+            ? `<button onclick="${fn}(${Number(id)}, true)" class="btn btn-secondary btn-sm shrink-0 text-red-600"><i class="fa-solid fa-user-slash"></i> Suspend Access</button>`
+            : `<button onclick="${fn}(${Number(id)}, false)" class="btn btn-secondary btn-sm shrink-0 text-green-700"><i class="fa-solid fa-user-check"></i> Restore Access</button>`;
+        return `<div class="ui-card flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 ${active ? '' : 'opacity-70'}">
+                    <div class="min-w-0"><p class="font-semibold text-slate-900">${esc(name)} ${badge}</p><p class="text-sm text-slate-500 mt-1">${metaHtml}</p></div>${btn}</div>`;
+    }
+
+    async function loadUsers() {
+        const list = document.getElementById('userList');
+        list.innerHTML = '<div class="skeleton" style="height:76px"></div><div class="skeleton mt-3" style="height:76px"></div>';
+
+        try {
+            const [tRes, sRes] = await Promise.all([
+                fetch('/api/admin/teachers'),
+                fetch('/api/admin/students')
+            ]);
+
+            const teachers = await tRes.json();
+            const students = await sRes.json();
+
+            if (teachers.length === 0 && students.length === 0) {
+                list.innerHTML = IGUI.empty({ icon: 'fa-users', title: 'No Users Found', text: 'There are no accounts in the system yet.' });
+                return;
+            }
+
+            let html = '';
+
+            if (teachers.length > 0) {
+                html += '<h2 class="text-sm font-semibold text-slate-600 mt-2 mb-1">Staff &amp; Principals</h2>';
+                teachers.forEach(t => {
+                    if (t.branchName === 'ADMIN') return;
+                    html += userRow(t.name, t.active,
+                        `<i class="fa-solid fa-building-columns mr-1"></i> ${esc(t.collegeName)} <span class="mx-1 text-slate-300">|</span> <i class="fa-solid fa-user-tie mr-1"></i> ${t.principal ? 'Principal' : 'Teacher'}`,
+                        'toggleTeacher', t.id);
+                });
+            }
+
+            if (students.length > 0) {
+                html += '<h2 class="text-sm font-semibold text-slate-600 mt-8 mb-1">Students</h2>';
+                students.forEach(s => {
+                    html += userRow(s.name, s.active,
+                        `<i class="fa-solid fa-building-columns mr-1"></i> ${esc(s.collegeName)} <span class="mx-1 text-slate-300">|</span> <i class="fa-solid fa-id-card mr-1"></i> ${esc(s.rollNo)}`,
+                        'toggleStudent', s.id);
+                });
+            }
+
+            list.innerHTML = html;
+        } catch (e) { list.innerHTML = IGUI.empty({ error: true, icon: 'fa-plug-circle-xmark', title: 'Could Not Load Users', retry: 'loadUsers()' }); }
+    }
+
+    async function confirmSuspend(isActive) {
+        if (!isActive) return true; // restoring access needs no confirmation
+        return IGUI.confirm({ title: 'Suspend This Account?', message: 'The user will not be able to sign in until you restore access.', confirmText: 'Suspend Access', danger: true });
+    }
+
+    async function toggleTeacher(id, isActive) {
+        if (!(await confirmSuspend(isActive))) return;
+        try { await fetch(`/api/admin/toggle-teacher/${id}`, { method: 'PUT' }); loadUsers(); } catch (e) { alert("Failed."); }
+    }
+
+    async function toggleStudent(id, isActive) {
+        if (!(await confirmSuspend(isActive))) return;
+        try { await fetch(`/api/admin/toggle-student/${id}`, { method: 'PUT' }); loadUsers(); } catch (e) { alert("Failed."); }
+    }
+
+    switchTab('approvals');
+</script>
+</body>
+</html>

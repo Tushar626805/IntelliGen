@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script src="api.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Principal Dashboard | IntelliGen</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="theme.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="style.css">
+    <script src="ui.js"></script>
+    <script src="ai-review.js"></script>
+    <script src="list-filter.js"></script>
+    <script src="export.js"></script>
+    <script src="results-table.js"></script>
+    <script src="answer-release.js"></script>
+    <script src="notifications.js"></script>
+    <script src="layout.js"></script>
+</head>
+<body class="text-slate-800 antialiased">
+
+<main id="igContent">
+    <div id="view-exams">
+        <div class="page-header flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div><h1 class="page-title">College Exams</h1><p class="page-sub">Every exam across your college. Review analytics or create a new exam for any department.</p></div>
+            <button onclick="openModal('createExamModal')" class="btn btn-primary btn-lg"><i class="fa-solid fa-plus"></i> Create Exam</button>
+        </div>
+        <div id="examGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6"></div>
+    </div>
+
+    <div id="view-approvals" class="hidden">
+        <div class="page-header"><h1 class="page-title">Pending Approvals</h1><p class="page-sub">Teacher registrations waiting for your approval.</p></div>
+        <div id="approvalsList" class="space-y-4"></div>
+    </div>
+
+    <div id="view-staff" class="hidden">
+        <div class="page-header"><h1 class="page-title">Heads of Department &amp; Staff</h1><p class="page-sub">Assign department heads or remove faculty accounts.</p></div>
+        <div id="staffList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+    </div>
+
+    <div id="view-promotion" class="hidden">
+        <div class="page-header"><h1 class="page-title">Promotion Engine</h1><p class="page-sub">Advance academic years or semesters for a whole department. These actions affect every student record in it.</p></div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            <div class="ui-card p-6">
+                <div class="flex items-center gap-3 mb-3">
+                    <span class="p-2.5 bg-rose-50 text-rose-600 rounded-xl text-lg"><i class="fa-solid fa-graduation-cap"></i></span>
+                    <h2 class="text-lg font-bold text-slate-800">Full Academic Year Promotion</h2>
+                </div>
+                <p class="text-slate-500 mb-6 text-xs leading-relaxed">
+                    Advances tracking classes globally (+1 Year, +2 Semesters). This action overwrites the active tracking Roll Numbers with dynamic engineering class tags (e.g., <span class="font-mono bg-slate-100 px-1 rounded text-rose-600 font-bold">TE0050</span>).
+                </p>
+                <div class="space-y-4">
+                    <input type="text" id="promoDept" aria-label="Department for Promotion" placeholder="Enter Department (e.g. Computer Science Engineering)" class="field-input">
+                    <button onclick="runPromotion()" id="runPromoBtn" class="btn btn-danger w-full">
+                        <i class="fa-solid fa-bolt"></i> Execute Class Promotion
+                    </button>
+                </div>
+            </div>
+
+            <div class="ui-card p-6">
+                <div class="flex items-center gap-3 mb-3">
+                    <span class="p-2.5 bg-blue-50 text-blue-600 rounded-xl text-lg"><i class="fa-solid fa-arrow-up-right-dots"></i></span>
+                    <h2 class="text-lg font-bold text-slate-800">Mid-Term Semester Increment Only</h2>
+                </div>
+                <p class="text-slate-500 mb-6 text-xs leading-relaxed">
+                    Increments student operational semesters by exactly <span class="font-bold text-blue-600">+1 Step</span> (e.g., Sem 3 to Sem 4). This action keeps the structural Academic Year counters and Roll Numbers locked.
+                </p>
+                <div class="space-y-4">
+                    <input type="text" id="semDeptInput" aria-label="Department for Semester Increment" placeholder="Enter Department (e.g. Computer Science Engineering)" class="field-input">
+                    <button onclick="executeSemesterIncrement()" id="runSemBtn" class="btn btn-primary w-full">
+                        <i class="fa-solid fa-calendar-plus"></i> Increment Semesters Only
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <div id="view-exceptions" class="hidden">
+        <div class="page-header flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div><h1 class="page-title">Fails &amp; Absentees</h1><p class="page-sub">Search a department to list students who failed or missed an exam.</p></div>
+            <div class="flex gap-2">
+                <input type="text" id="excDept" aria-label="Target Department" placeholder="Target Department..." class="field-input sm:w-64" onkeydown="if(event.key==='Enter') loadExceptions()">
+                <button onclick="loadExceptions()" class="btn btn-primary"><i class="fa-solid fa-magnifying-glass"></i> Search</button>
+            </div>
+        </div>
+        <div class="ui-card overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                <tr class="bg-slate-50 text-slate-500 text-xs font-bold border-b border-slate-100">
+                    <th scope="col" class="p-4">Roll No / PRN</th><th scope="col" class="p-4">Student Name</th><th scope="col" class="p-4">Exam Context</th><th scope="col" class="p-4 text-center">Score</th><th scope="col" class="p-4 text-center">Status</th>
+                </tr>
+                </thead>
+                <tbody id="exceptionsTableBody" class="divide-y divide-slate-100">
+                <tr><td colspan="5" class="text-center py-8 text-slate-400">Search for a department to load critical exceptions.</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</main>
+
+<script>
+    IGLayout.mount({
+        role: 'Principal', contextId: 'collegeHeader',
+        nav: [
+            { id: 'tab-exams', icon: 'fa-clipboard-list', label: 'College Exams', onclick: "switchTab('exams')", active: true },
+            { id: 'tab-approvals', icon: 'fa-user-check', label: 'Pending Approvals', onclick: "switchTab('approvals')" },
+            { id: 'tab-staff', icon: 'fa-users-gear', label: 'HOD & Staff', onclick: "switchTab('staff')" },
+            { id: 'tab-promotion', icon: 'fa-graduation-cap', label: 'Promotion Engine', onclick: "switchTab('promotion')" },
+            { id: 'tab-exceptions', icon: 'fa-triangle-exclamation', label: 'Fails & Absentees', onclick: "switchTab('exceptions')" }
+        ],
+        tools: [ { icon: 'fa-box-archive', label: 'Archives', onclick: "openModal('archiveModal'); loadArchives()" } ]
+    });
+</script>
+
+<div id="resultsModal" class="modal-overlay fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col md:flex-row max-h-[85vh]">
+        <div class="w-full md:w-2/3 flex flex-col bg-white">
+            <div class="flex justify-between items-center p-6 border-b border-slate-100">
+                <h2 id="resModalTitle" class="text-xl font-bold text-slate-800">Exam Results</h2>
+                <button onclick="closeModal('resultsModal')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            <div class="overflow-y-auto flex-1 p-6">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                    <tr class="text-slate-500 text-xs font-bold bg-slate-50">
+                        <th scope="col" class="p-3 rounded-l-lg">Roll No</th>
+                        <th scope="col" class="p-3">Student Name</th>
+                        <th scope="col" class="p-3 text-right">Score</th>
+                        <th scope="col" class="p-3 text-right rounded-r-lg">Percentage</th>
+                    </tr>
+                    </thead>
+                    <tbody id="resTableBody" class="divide-y divide-slate-100"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="w-full md:w-1/3 bg-slate-50 p-6 border-l border-slate-100 flex flex-col items-center justify-start overflow-y-auto">
+            <h2 class="font-bold text-slate-700 mb-6">Class Performance Metrics</h2>
+            <div class="w-48 h-48 mb-8 relative"><canvas id="analyticsChart"></canvas></div>
+            <div id="absentBadge" class="bg-red-100 text-red-700 font-bold px-4 py-3 rounded-xl text-sm w-full text-center mb-6 border border-red-200">0 Students Absent</div>
+            <div id="answerReleaseBox"></div>
+            <div class="w-full border-t border-slate-200 pt-6 mt-auto">
+                <button onclick="analyzeDifficulty()" id="analyzeBtn" class="bg-[#f59e0b] hover:bg-[#d97706] text-white px-4 py-3.5 rounded-xl font-bold transition-all w-full text-sm shadow-md flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-lightbulb"></i> Analyze High-Failure Questions
+                </button>
+                <div id="analysisResultArea" class="mt-4 space-y-3 w-full"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="createExamModal" class="modal-overlay fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto transform transition-all">
+        <div class="p-8 border-b sticky top-0 bg-white z-10 flex justify-between items-center">
+            <h2 id="createModalTitle" class="text-2xl font-bold text-slate-900">Configure New Exam</h2>
+            <button onclick="closeModal('createExamModal')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-circle-xmark text-2xl"></i></button>
+        </div>
+
+        <div class="p-8">
+            <form id="createExamForm">
+                <div class="mb-6">
+                    <label class="field-label" for="examTitle">Exam Title</label>
+                    <input type="text" id="examTitle" placeholder="e.g., Mathematics Quiz - Unit 1" class="w-full rounded-xl border border-slate-200 px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none" required>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div>
+                        <label class="field-label" for="examDept">Target Dept</label>
+                        <input type="text" id="examDept" placeholder="e.g., Computer Science" class="w-full rounded-xl border border-slate-200 px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none" required>
+                    </div>
+                    <div>
+                        <label class="field-label" for="examSubject">Subject Name</label>
+                        <input type="text" id="examSubject" placeholder="e.g., Database Management Systems" class="w-full rounded-xl border border-slate-200 px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none" required>
+                    </div>
+                    <div>
+                        <label class="field-label" for="targetSemester">Target Semester</label>
+                        <select id="targetSemester" class="w-full rounded-xl border border-slate-200 px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none bg-white" required>
+                            <option value="">Select Target Semester...</option>
+                            <option value="1">Semester 1</option><option value="2">Semester 2</option>
+                            <option value="3">Semester 3</option><option value="4">Semester 4</option>
+                            <option value="5">Semester 5</option><option value="6">Semester 6</option>
+                            <option value="7">Semester 7</option><option value="8">Semester 8</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                    <div>
+                        <label class="field-label" for="duration">Duration (Mins)</label>
+                        <input type="number" id="duration" value="30" class="w-full rounded-lg border border-slate-200 px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none" required>
+                    </div>
+                    <div>
+                        <label class="field-label" for="startTime">Start Time</label>
+                        <input type="datetime-local" id="startTime" class="w-full rounded-lg border border-slate-200 px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none" required>
+                    </div>
+                    <div>
+                        <label class="field-label" for="endTime">End Time</label>
+                        <input type="datetime-local" id="endTime" class="w-full rounded-lg border border-slate-200 px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none" required>
+                    </div>
+                </div>
+
+                <div class="border-t border-slate-200 my-8"></div>
+                <h2 class="text-lg font-bold text-slate-800 mb-4">Add Questions</h2>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                    <div class="bg-blue-50 p-6 rounded-2xl border border-blue-100">
+                        <h2 class="font-bold text-blue-900 mb-2"><i class="fa-solid fa-wand-magic-sparkles mr-2"></i>Option 1: Auto-Generate with AI</h2>
+                        <p class="text-xs text-slate-600 mb-4">Upload a PDF and let IGen create MCQs instantly.</p>
+
+                        <div class="upload-area rounded-xl p-6 text-center bg-white mb-4" onclick="document.getElementById('pdfFile').click()">
+                            <i class="fa-solid fa-cloud-arrow-up text-3xl text-slate-300 mb-2"></i>
+                            <p class="text-slate-600 text-sm font-semibold">Upload PDF</p>
+                            <input type="file" id="pdfFile" accept=".pdf" class="hidden" onchange="updateFileName(this)">
+                        </div>
+                        <p id="fileNameDisplay" class="text-xs text-blue-600 font-bold mb-3 hidden text-center"></p>
+
+                        <div class="flex gap-2 mb-4">
+                            <input type="number" id="numQuestions" value="5" min="1" placeholder="Qty" class="w-20 rounded-lg border px-3 py-2 text-sm outline-none">
+                            <button type="button" onclick="runAI()" id="generateBtn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg transition-all text-sm">
+                                Generate
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-50 p-6 rounded-2xl border border-slate-200">
+                        <h2 class="font-bold text-slate-800 mb-2"><i class="fa-solid fa-pen mr-2"></i>Option 2: Add Manually</h2>
+                        <p class="text-xs text-slate-500 mb-4">Type your own custom multiple-choice question.</p>
+
+                        <input type="text" id="manQText" placeholder="Question text..." class="w-full text-sm p-2.5 rounded-lg border mb-2 outline-none">
+                        <div class="grid grid-cols-2 gap-2 mb-2">
+                            <input type="text" id="manOptA" placeholder="Option A" class="text-sm p-2 rounded-lg border outline-none">
+                            <input type="text" id="manOptB" placeholder="Option B" class="text-sm p-2 rounded-lg border outline-none">
+                            <input type="text" id="manOptC" placeholder="Option C" class="text-sm p-2 rounded-lg border outline-none">
+                            <input type="text" id="manOptD" placeholder="Option D" class="text-sm p-2 rounded-lg border outline-none">
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 mb-3">
+                            <select id="manCorrect" class="w-full text-sm p-2.5 rounded-lg border outline-none bg-white">
+                                <option value="">Select Correct Answer...</option>
+                                <option value="A">Option A</option>
+                                <option value="B">Option B</option>
+                                <option value="C">Option C</option>
+                                <option value="D">Option D</option>
+                            </select>
+                            <input type="number" id="manMarks" placeholder="Marks (Default 1)" min="1" value="1" class="w-full text-sm p-2.5 rounded-lg border outline-none">
+                        </div>
+                        <button type="button" onclick="addManualQuestion()" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-2 rounded-lg transition-all text-sm">
+                            Add to Exam
+                        </button>
+                    </div>
+                </div>
+            </form>
+
+            <div id="loadingIndicator" class="hidden text-center py-10">
+                <div class="loader ease-linear rounded-full border-4 border-t-4 border-blue-500 h-10 w-10 mx-auto mb-4"></div>
+                <p class="text-slate-500 text-sm font-medium">AI is generating questions...</p>
+            </div>
+
+            <div id="resultsContainer" class="hidden mt-6">
+                <div class="flex justify-between items-center mb-4 border-b pb-2">
+                    <h2 class="text-lg font-bold text-slate-800">Exam Preview</h2>
+                    <span id="qCountBadge" class="bg-slate-200 text-slate-700 text-xs px-2 py-1 rounded-full font-bold">0 Questions</span>
+                </div>
+
+                <div id="mcqList" class="space-y-4 max-h-[40vh] overflow-y-auto pr-2"></div>
+
+                <button onclick="saveExam()" id="saveBtn" class="mt-8 w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-2xl shadow-lg transition-all flex justify-center items-center text-lg">
+                    <i class="fa-solid fa-check-double mr-2"></i> Save and Publish Exam
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="archiveModal" class="modal-overlay fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl w-full max-w-2xl p-6 shadow-2xl">
+        <h2 class="text-xl font-bold mb-4 text-slate-800">Global Exam Archives</h2>
+        <div id="archiveList" class="space-y-3 max-h-[60vh] overflow-y-auto"></div>
+        <button onclick="closeModal('archiveModal')" class="mt-6 w-full bg-slate-100 hover:bg-slate-200 py-3 rounded-xl font-bold">Close</button>
+    </div>
+</div>
+
+<div id="deleteModal" class="modal-overlay fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 text-center">
+        <div class="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4"><i class="fa-solid fa-triangle-exclamation"></i></div>
+        <h2 class="text-xl font-bold text-slate-900 mb-2">Secure Archive & Delete</h2>
+        <p class="text-sm text-slate-500 mb-4">Enter your profile password to verify. Student records will be permanently bundled into a secure PDF archive before local deletion.</p>
+        <input type="password" id="deletePassword" placeholder="Your Password" class="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-red-500 mb-4">
+        <p id="deleteErr" class="text-red-500 text-sm font-bold hidden mb-4"></p>
+        <div class="flex gap-3">
+            <button onclick="closeModal('deleteModal')" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl transition-colors">Cancel</button>
+            <button onclick="confirmDelete()" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl transition-colors">Archive & Delete</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    function escapeHTML(str) {
+        if (!str) return '';
+        return str.toString()
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    // ========================================================
+    // 🚨 GLOBAL MULTI-TENANT FETCH HEADERS INTERCEPTOR ENGINE
+    // ========================================================
+    (function() {
+        const originalFetch = window.fetch;
+        window.fetch = async function(...args) {
+            let [resource, config] = args;
+            config = config || {};
+            config.headers = config.headers || {};
+
+            const sessionUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+            if (sessionUser.collegeName) {
+                config.headers['X-College-Name'] = sessionUser.collegeName;
+            }
+
+            return originalFetch(resource, config);
+        };
+    })();
+
+    const user = JSON.parse(localStorage.getItem('currentUser') || '{}');
+    document.getElementById('collegeHeader').innerText = user.collegeName || 'Your College';
+
+    let currentChart = null;
+    let currentViewExamId = null;
+    let targetDeleteExamId = null;
+    let editingDraftId = null;
+
+    function openModal(id) {
+        document.getElementById(id).classList.remove('hidden');
+        if (id === 'createExamModal') {
+            IGReview.reset();
+            editingDraftId = null;
+            document.getElementById('createModalTitle').innerText = 'Configure New Exam';
+            document.getElementById('createExamForm').reset();
+            document.getElementById('fileNameDisplay').classList.add('hidden');
+            renderPreviewList();
+        }
+    }
+
+    function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+    function switchTab(tab) {
+        ['exams', 'approvals', 'staff', 'promotion', 'exceptions'].forEach(t => {
+            const view = document.getElementById('view-' + t);
+            const btn = document.getElementById('tab-' + t);
+            if(view && btn) {
+                if(t === tab) {
+                    view.classList.remove('hidden');
+                    btn.classList.replace('tab-inactive', 'tab-active');
+                } else {
+                    view.classList.add('hidden');
+                    btn.classList.replace('tab-active', 'tab-inactive');
+                }
+            }
+        });
+
+        if(tab === 'exams') loadExams();
+        if(tab === 'approvals') loadApprovals();
+        if(tab === 'staff') loadStaff();
+    }
+
+    async function loadExams() {
+        const grid = document.getElementById('examGrid');
+        grid.innerHTML = IGUI.skeletonCards(4);
+        try {
+            const res = await fetch(`/api/exam/all`);
+            const exams = await res.json();
+
+            grid.innerHTML = exams.map(exam => {
+                const safeSubject = (exam.subjectName && exam.subjectName !== 'null') ? exam.subjectName : 'General';
+                const creator = exam.createdByTeacherUsername || 'Unknown';
+                const startTime = exam.startTime ? new Date(exam.startTime).toLocaleString() : 'N/A';
+                const endTime = exam.endTime ? new Date(exam.endTime).toLocaleString() : 'N/A';
+                const isDraft = exam.status === 'DRAFT';
+
+                return `
+                <article class="ui-card ui-card-hover p-6 flex flex-col h-full">
+                    <div class="flex justify-between items-start mb-1">
+                        <h2 class="text-lg font-semibold text-slate-900 leading-snug">${escapeHTML(exam.title)}</h2>
+${isDraft ? '<span class="badge badge-amber">DRAFT</span>' : `                        <button onclick="openDeleteModal(${exam.id})" class="w-8 h-8 shrink-0 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Delete exam" aria-label="Delete exam"><i class="fa-solid fa-trash"></i></button>`}
+                    </div>
+                    <p class="text-[11px] font-semibold text-slate-500 mb-3">
+                        ${escapeHTML(exam.departmentName)} <span class="text-slate-300 mx-1">|</span> Sem ${exam.targetSemester}
+                    </p>
+                    <div class="mb-4">
+                        <span class="badge badge-blue">${escapeHTML(safeSubject)}</span>
+                    </div>
+
+                    <div class="text-xs text-slate-500 space-y-1.5 mb-6 border-t border-slate-100 pt-4">
+                        <p><i class="fa-regular fa-clock w-4 text-blue-500"></i> ${exam.durationMinutes} Mins</p>
+                        <p><i class="fa-regular fa-calendar-alt w-4 text-blue-500"></i> Start: ${startTime}</p>
+                        <p><i class="fa-regular fa-calendar-times w-4 text-red-400"></i> End: ${endTime}</p>
+                        <p class="truncate"><i class="fa-solid fa-user-pen w-4 text-slate-400"></i> ${escapeHTML(creator)}</p>
+                    </div>
+
+                    <div class="mt-auto">
+${isDraft ? IGReview.draftButtons(exam, 'loadExams') : `                        <button onclick="viewResults(${exam.id}, '${escapeHTML(exam.title).replace(/'/g, "\\'")}')" class="btn btn-secondary w-full">
+                            <i class="fa-solid fa-chart-column"></i> View Analytics
+                        </button>`}
+                    </div>
+                </article>`;
+            }).join('') || IGUI.empty({ icon: 'fa-clipboard-list', title: 'No Exams Found', text: 'Exams created in your college will appear here.', action: { label: 'Create Exam', onclick: "openModal('createExamModal')" } });
+        } catch(e) { grid.innerHTML = IGUI.empty({ error: true, icon: 'fa-plug-circle-xmark', title: 'Could Not Load Exams', text: 'Error connecting to the server.', retry: 'loadExams()' }); }
+    }
+
+    function openDeleteModal(id) {
+        targetDeleteExamId = id;
+        document.getElementById('deleteErr').classList.add('hidden');
+        document.getElementById('deletePassword').value = '';
+        openModal('deleteModal');
+    }
+
+    async function confirmDelete() {
+        const pwd = document.getElementById('deletePassword').value;
+        const err = document.getElementById('deleteErr');
+        if (!pwd) {
+            err.innerText = "Verification signature required.";
+            err.classList.remove('hidden');
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/exam/archive-delete/${targetDeleteExamId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    password: pwd,
+                    username: user.email || user.username || "Principal Admin"
+                })
+            });
+
+            if (res.ok) {
+                closeModal('deleteModal');
+                if (typeof loadExams === 'function') loadExams();
+            } else {
+                const data = await res.json();
+                err.innerText = data.error || "Profile validation credentials incorrect.";
+                err.classList.remove('hidden');
+            }
+        } catch (e) {
+            console.error(e);
+            err.innerText = "Error: Could not reach server.";
+            err.classList.remove('hidden');
+        }
+    }
+
+    function updateFileName(input) {
+        const display = document.getElementById('fileNameDisplay');
+        if(input.files[0]) {
+            display.innerHTML = `<i class="fa-solid fa-file-pdf mr-1"></i> ${escapeHTML(input.files[0].name)}`;
+            display.classList.remove('hidden');
+        }
+    }
+
+    // AI QUESTION GENERATION + REVIEW (shared module: ai-review.js)
+    async function runAI() { return IGReview.generate(); }
+    function addManualQuestion() { IGReview.addManual(); }
+    function renderPreviewList() { IGReview.render(); }
+
+    // SAVE A DRAFT OR PUBLISH
+    async function saveExam(asDraft) {
+        asDraft = asDraft === true;
+        const title = document.getElementById('examTitle').value.trim();
+        const dept = document.getElementById('examDept').value;
+        const subj = document.getElementById('examSubject').value.trim();
+        const sem = document.getElementById('targetSemester').value;
+        const dur = document.getElementById('duration').value;
+        const start = document.getElementById('startTime').value;
+        const end = document.getElementById('endTime').value;
+
+        if (!title) return IGUI.toast('Give the exam a title.', 'error');
+        if (!dept) return IGUI.toast('Choose the department this exam is for.', 'error');
+        if (!asDraft) {
+            if (!subj || !sem || !dur || !start || !end) return IGUI.toast('Fill in the subject, semester, duration, start time and end time before publishing.', 'error');
+            if (new Date(end) <= new Date(start)) return IGUI.toast('The end time must be after the start time.', 'error');
+            if (IGReview.count() === 0) return IGUI.toast('Add at least one question before publishing.', 'error');
+        }
+        let questions;
+        try { questions = IGReview.exportQuestions(); } catch (err) { return IGUI.toast(err.message, 'error'); }
+        if (!asDraft && !(await IGReview.confirmPublish(title))) return;
+
+        const btn = document.getElementById(asDraft ? 'rvDraftBtn' : 'saveBtn');
+        const originalLabel = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Saving...';
+        btn.disabled = true;
+
+        const payload = {
+            title: title, subjectName: subj || null, targetSemester: sem ? parseInt(sem) : null,
+            durationMinutes: dur ? parseInt(dur) : 30, startTime: start || null, endTime: end || null,
+            departmentName: dept, questions: questions
+        };
+
+        try {
+            const url = `/api/exam/teacher/save?draft=${asDraft}` + (editingDraftId ? `&replaces=${encodeURIComponent(editingDraftId)}` : '');
+            const res = await fetch(url, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+            if (res.ok) {
+                IGUI.toast(asDraft ? 'Draft saved. Publish it from the exam list when you are ready.' : 'Exam published for ' + dept + '.', 'success');
+                editingDraftId = null;
+                closeModal('createExamModal');
+                loadExams();
+            } else {
+                const text = (await res.text()).replace(/^Error:\s*/, '');
+                IGUI.toast(text && text.length < 300 ? text : 'The exam could not be saved.', 'error');
+            }
+        } catch (e) {
+            IGUI.toast('Could not reach the server. Your questions are still on screen, so try again.', 'error');
+        } finally {
+            btn.innerHTML = originalLabel;
+            btn.disabled = false;
+        }
+    }
+
+    async function editDraft(id) {
+        try {
+            const ex = await IGReview.fetchDraft(id);
+            openModal('createExamModal');
+            document.getElementById('examTitle').value = ex.title || '';
+            document.getElementById('examSubject').value = ex.subjectName || '';
+            document.getElementById('targetSemester').value = ex.targetSemester || '';
+            document.getElementById('duration').value = ex.durationMinutes || 30;
+            document.getElementById('startTime').value = IGReview.toInputDateTime(ex.startTime);
+            document.getElementById('endTime').value = IGReview.toInputDateTime(ex.endTime);
+            document.getElementById('examDept').value = ex.departmentName || '';
+            IGReview.loadQuestions(ex.questions || []);
+            editingDraftId = id;
+            document.getElementById('createModalTitle').innerText = 'Edit draft';
+        } catch (err) { IGUI.toast(err.message, 'error'); }
+    }
+
+    async function loadApprovals() {
+        const list = document.getElementById('approvalsList');
+        list.innerHTML = '<div class="skeleton" style="height:76px"></div>';
+        try {
+            const res = await fetch(`/api/auth/principal/pending-teachers/${encodeURIComponent(user.collegeName || 'Tech Institute')}`);
+            const data = await res.json();
+            list.innerHTML = data.length ? data.map(p => `
+                <div class="ui-card flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-5">
+                    <div>
+                        <p class="font-semibold text-slate-900">${escapeHTML(p.name)}</p>
+                        <p class="text-sm text-slate-500">${escapeHTML(p.branchName)} | <span class="font-mono text-xs">${escapeHTML(p.username)}</span></p>
+                    </div>
+                    <button onclick="approveAccount(${p.id})" class="btn btn-success shrink-0">
+                        <i class="fa-solid fa-check"></i> Approve Account
+                    </button>
+                </div>
+            `).join('') : IGUI.empty({ icon: 'fa-user-check', title: 'All Caught Up', text: 'No pending teacher accounts are waiting for approval.' });
+        } catch(e) { list.innerHTML = IGUI.empty({ error: true, icon: 'fa-plug-circle-xmark', title: 'Could Not Load Approvals', retry: 'loadApprovals()' }); }
+    }
+
+    async function approveAccount(id) {
+        try {
+            const res = await fetch(`/api/auth/principal/approve-teacher/${id}`, { method: 'PUT' });
+            IGUI.toast(res.ok ? 'Account approved.' : 'Failed to approve this account.', res.ok ? 'success' : 'error');
+            loadApprovals();
+        } catch(e) { alert("Error approving account."); }
+    }
+
+    async function loadStaff() {
+        const list = document.getElementById('staffList');
+        list.innerHTML = IGUI.skeletonCards(3);
+
+        try {
+            const res = await fetch(`/api/principal/teachers`);
+            if (!res.ok) {
+                list.innerHTML = IGUI.empty({ error: true, icon: 'fa-circle-exclamation', title: 'Could Not Load Staff', text: `Backend error ${res.status}: failed to fetch teachers.`, retry: 'loadStaff()' });
+                return;
+            }
+
+            let data = await res.json();
+            if(!Array.isArray(data)) data = [];
+
+            list.innerHTML = data.length ? data.map(t => {
+                // Double safety client filter check: Never show oneself or other principal accounts
+                if(t.role === 'PRINCIPAL' || t.isPrincipal || t.username === user.username) return '';
+
+                const isHOD = t.role === 'HOD';
+                const currentBranch = t.branchName || t.department || 'General';
+
+                return `
+                <div class="ui-card ui-card-hover p-6 flex flex-col justify-between">
+                    <div class="mb-6">
+                        <div class="flex justify-between items-start mb-2">
+                            <h2 class="font-semibold text-slate-900">${escapeHTML(t.name) || 'Unknown'}</h2>
+                            <span class="badge ${isHOD ? 'badge-blue' : 'badge-slate'}">${escapeHTML(t.role) || 'TEACHER'}</span>
+                        </div>
+                        <p class="text-sm text-slate-500 mb-1"><i class="fa-solid fa-building-columns mr-2 w-4"></i>${escapeHTML(currentBranch)}</p>
+                        <p class="text-xs text-slate-400 font-mono"><i class="fa-solid fa-envelope mr-2 w-4"></i>${escapeHTML(t.username || t.email || 'No Email')}</p>
+                    </div>
+                    <div class="flex flex-col gap-2">
+                        <div class="flex gap-2">
+                            ${isHOD
+                    ? `<button onclick="revokeHOD(${t.id})" class="btn btn-secondary btn-sm flex-1">Revoke HOD</button>`
+                    : `<button onclick="assignHOD(${t.id})" class="btn btn-primary btn-sm flex-1">Make HOD</button>`
+                }
+                        </div>
+                        <!-- 🚨 NEW: Added direct Administrative Revocation deletion pipeline -->
+                        <button onclick="revokeStaffProfile(${t.id}, '${escapeHTML(currentBranch).replace(/'/g, "\\'")}')" class="btn btn-sm w-full text-red-600 bg-red-50 hover:bg-red-100">
+                            <i class="fa-solid fa-user-minus"></i> Revoke Teacher Account
+                        </button>
+                    </div>
+                </div>`;
+            }).join('') : IGUI.empty({ icon: 'fa-users', title: 'No Staff Members Found', text: 'Approved teachers and heads of department will be listed here.' });
+        } catch(e) { list.innerHTML = IGUI.empty({ error: true, icon: 'fa-plug-circle-xmark', title: 'Could Not Load Staff', retry: 'loadStaff()' }); }
+    }
+
+    // 🚨 NEW JS METHOD LINKING TO YOUR CONTROLLER'S DELETE ENDPOINT
+    async function revokeStaffProfile(id, branchName) {
+        const okRevoke = await IGUI.confirm({ title: 'Revoke This Teacher Account?', message: 'This permanently deletes the instructor account from your organization registry. This action cannot be undone.', confirmText: 'Revoke Account', danger: true });
+        if(!okRevoke) return;
+
+        try {
+            const res = await fetch(`/api/principal/teachers/${id}?authorizedDepartment=${encodeURIComponent(branchName)}`, {
+                method: 'DELETE'
+            });
+            const data = await res.json();
+            if(res.ok) {
+                alert(data.message || "Account revoked successfully.");
+                loadStaff();
+            } else {
+                alert(data.error || "Failed to remove staff account.");
+            }
+        } catch(e) {
+            alert("Error communicating with deletion server endpoint.");
+        }
+    }
+
+    async function assignHOD(id) {
+        try {
+            const res = await fetch(`/api/principal/teacher/${id}/assign-hod`, { method: 'PUT' });
+            IGUI.toast(res.ok ? 'Head of department assigned.' : 'Failed to assign head of department.', res.ok ? 'success' : 'error');
+        } catch(e) { IGUI.toast('Failed to assign head of department.', 'error'); }
+        loadStaff();
+    }
+    async function revokeHOD(id) {
+        const ok = await IGUI.confirm({ title: 'Revoke HOD Role?', message: 'This teacher will lose head-of-department permissions but keep their account.', confirmText: 'Revoke HOD', danger: true });
+        if(!ok) return;
+        try {
+            const res = await fetch(`/api/principal/teacher/${id}/revoke-hod`, { method: 'PUT' });
+            IGUI.toast(res.ok ? 'HOD role revoked.' : 'Failed to revoke HOD role.', res.ok ? 'success' : 'error');
+        } catch(e) { IGUI.toast('Failed to revoke HOD role.', 'error'); }
+        loadStaff();
+    }
+
+    async function runPromotion() {
+        const dept = document.getElementById('promoDept').value.trim();
+        if(!dept) return alert("Please enter the target department name.");
+        const okPromo = await IGUI.confirm({ title: `Run promotion for "${dept}"?`, message: 'This advances academic years and assigns Engineering class roll numbers (FE/SE/TE/BE) for every student in the department. This cannot be undone.', confirmText: 'Run Promotion', danger: true });
+        if(!okPromo) return;
+
+        const btn = document.getElementById('runPromoBtn');
+        if(btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Processing...'; }
+
+        try {
+            const res = await fetch(`/api/principal/promote-year?departmentName=${encodeURIComponent(dept)}`, { method: 'POST' });
+            const data = await res.json();
+            alert(data.message || "Engine executed successfully.");
+            document.getElementById('promoDept').value = '';
+        } catch(e) {
+            alert("Error communicating with promotion engine.");
+        } finally {
+            if(btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-bolt"></i> Execute Class Promotion'; }
+        }
+    }
+
+    async function executeSemesterIncrement() {
+        const dept = document.getElementById('semDeptInput')?.value?.trim();
+        if(!dept) return alert("Please enter the target department name to increment terms.");
+
+        const okSem = await IGUI.confirm({ title: `Advance semesters for "${dept}"?`, message: 'Every student in this department moves forward by one semester. Academic years and roll numbers stay unchanged.', confirmText: 'Advance Semesters' });
+        if(!okSem) return;
+
+        const btn = document.getElementById('runSemBtn');
+        if(btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Processing...'; }
+
+        try {
+            const res = await fetch(`/api/principal/increment-semester?departmentName=${encodeURIComponent(dept)}`, {
+                method: 'POST'
+            });
+            const data = await res.json();
+
+            if (res.ok) {
+                alert(data.message || "Semesters advanced smoothly across the student records registry.");
+                document.getElementById('semDeptInput').value = '';
+                if (typeof loadExceptions === 'function') loadExceptions();
+            } else {
+                alert("Error executing semester update: " + (data.error || "Server validation rejected."));
+            }
+        } catch(e) {
+            console.error(e);
+            alert("Error communicating with semester engine.");
+        } finally {
+            if(btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-calendar-plus"></i> Increment Semesters Only'; }
+        }
+    }
+
+    async function loadExceptions() {
+        const deptInput = document.getElementById('excDept')?.value?.trim();
+        if(!deptInput) return alert("Please enter a department name to search.");
+
+        const tbody = document.getElementById('exceptionsTableBody');
+        if(!tbody) return;
+
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-slate-500"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Analyzing Department Records...</td></tr>';
+
+        try {
+            const res = await fetch(`/api/principal/department-exceptions?department=${encodeURIComponent(deptInput)}`);
+            if (!res.ok) throw new Error("Server error");
+            const data = await res.json();
+
+            if(!Array.isArray(data) || data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-emerald-600 bg-emerald-50 font-bold border-b border-emerald-100">No failures or absentees were found for this department.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = data.map(r => {
+                const isFail = r.status === 'FAILED';
+                return `
+            <tr class="hover:bg-slate-50 transition-colors">
+                <td class="p-4 font-mono text-sm text-slate-500 font-bold">${escapeHTML(r.rollNo)}</td>
+                <td class="p-4 font-semibold text-slate-800">${escapeHTML(r.name)}</td>
+                <td class="p-4 text-slate-600 text-sm font-medium">${escapeHTML(r.examTitle)}</td>
+                <td class="p-4 text-center text-slate-700 font-bold">${escapeHTML(r.score)} (${escapeHTML(r.percentage)})</td>
+                <td class="p-4 text-center">
+                    <span class="px-3 py-1 text-[10px] font-bold rounded-full border ${isFail ? 'bg-red-50 text-red-600 border-red-200' : 'bg-amber-50 text-amber-600 border-amber-200'}">
+                        ${escapeHTML(r.status)}
+                    </span>
+                </td>
+            </tr>`;
+            }).join('');
+
+        } catch(e) {
+            console.error(e);
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-red-500 font-bold bg-red-50">The exception records could not be loaded. Please try again.</td></tr>';
+        }
+    }
+
+    const safeExtract = (val, fallback) => (val === undefined || val === null || val === 'undefined' || String(val).trim() === '') ? fallback : val;
+
+    async function viewResults(id, title) {
+        currentViewExamId = id;
+        document.getElementById('resModalTitle').innerText = title;
+        document.getElementById('analysisResultArea').innerHTML = '';
+        openModal('resultsModal');
+
+        // Rows, search, sorting and error handling live in results-table.js (shared with the principal dashboard).
+        const [resData, statsData] = await Promise.all([
+            IGResults.load(id),
+            IGResults.getJson(`/api/exam/${id}/analytics`).catch(() => null)
+        ]);
+        IGExport.resultsButton('resModalTitle', resData || [], title);
+        IGAnswerRelease.mount(id);
+
+        if (currentChart) { currentChart.destroy(); currentChart = null; }
+        if (!statsData) {
+            document.getElementById('absentBadge').innerText = 'Statistics are unavailable right now.';
+            return;
+        }
+        document.getElementById('absentBadge').innerText = `${statsData.absent || 0} Students Absent`;
+        currentChart = new Chart(document.getElementById('analyticsChart').getContext('2d'), {
+            type: 'doughnut',
+            data: { labels: ['Passed', 'Failed'], datasets: [{ data: [statsData.passed || 0, statsData.failed || 0], backgroundColor: ['#10b981', '#ef4444'], borderWidth: 0 }] },
+            options: { responsive: true, maintainAspectRatio: false, cutout: '75%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } } }
+        });
+    }
+
+    async function analyzeDifficulty() {
+        if(!currentViewExamId) return;
+
+        const btn = document.getElementById('analyzeBtn');
+        const area = document.getElementById('analysisResultArea');
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Analyzing...';
+        btn.disabled = true;
+
+        try {
+            const res = await fetch(`/api/exam/${currentViewExamId}/hardest-questions`);
+            const data = await res.json();
+
+            if(data.length === 0) {
+                area.innerHTML = '<p class="text-sm text-slate-500 text-center font-bold mt-2 bg-slate-100 p-4 rounded-xl">No failed questions have been recorded for this exam yet.</p>';
+                return;
+            }
+
+            let html = '<h2 class="text-xs font-bold text-slate-500 mb-3 mt-4">High-Failure Question Warning</h2>';
+            data.slice(0, 3).forEach(q => {
+                html += `
+                <div class="bg-red-50 p-3 rounded-xl border border-red-200 mb-2 shadow-sm">
+                    <p class="font-bold text-red-900 text-xs mb-2 leading-snug">${escapeHTML(q[0])}</p>
+                    <p class="text-[10px] font-bold text-red-700 bg-red-100 inline-block px-2.5 py-1 rounded-md">
+                        <i class="fa-solid fa-users-slash mr-1"></i>Incorrect: ${q[1]} Students
+                    </p>
+                </div>`;
+            });
+            area.innerHTML = html;
+        } catch (e) {
+            area.innerHTML = '<p class="text-sm text-red-500 font-bold bg-red-50 p-3 rounded-lg">The question analysis could not be displayed.</p>';
+        } finally {
+            btn.innerHTML = '<i class="fa-solid fa-lightbulb"></i> Analyze High-Failure Questions';
+            btn.disabled = false;
+        }
+    }
+
+    async function loadArchives() {
+        const list = document.getElementById('archiveList');
+        list.innerHTML = '<div class="skeleton" style="height:64px"></div><div class="skeleton mt-3" style="height:64px"></div>';
+
+        try {
+            const res = await fetch('/api/exam/all-archives');
+            const data = await res.json();
+
+            list.innerHTML = data.length ? data.map(a => `
+            <div class="flex justify-between items-center gap-3 p-4 border border-slate-200 rounded-xl mb-2 bg-white">
+                <div class="flex flex-col">
+                    <span class="font-bold text-slate-800">${escapeHTML(a.examTitle)}</span>
+                    <span class="text-xs text-slate-400">Archived by: ${escapeHTML(a.archivedByUsername)}</span>
+                </div>
+                <button onclick="downloadArchive(${a.id})" class="btn btn-primary btn-sm shrink-0">
+                    <i class="fa-solid fa-download"></i> Download
+                </button>
+            </div>
+        `).join('') : IGUI.empty({ icon: 'fa-box-archive', title: 'No Archives Yet', text: 'Archived exams from your college will be stored here.' });
+
+        } catch(e) {
+            console.error(e);
+            list.innerHTML = IGUI.empty({ error: true, icon: 'fa-plug-circle-xmark', title: 'Could Not Load Archives', retry: 'loadArchives()' });
+        }
+    }
+
+    // The archive list above calls this; same request format the teacher page uses
+    async function downloadArchive(id) {
+        const pwd = await IGUI.prompt({ title: 'Authorize Download', message: 'Enter your account password to download this archive.', password: true, confirmText: 'Download', icon: 'fa-lock' });
+        if(!pwd) return;
+        try {
+            const res = await fetch(`/api/exam/retrieve-archive/${id}`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pwd, username: user.email || user.username })
+            });
+            if(res.ok) {
+                const blob = await res.blob();
+                const a = document.createElement('a'); a.href = window.URL.createObjectURL(blob); a.download = `ArchivedExam_${id}.pdf`; a.click();
+            } else alert("Authorization failed. Please check your password.");
+        } catch(e) { alert("Error connecting to server."); }
+    }
+
+    switchTab('exams');
+
+    IGFilter.mount('examGrid');
+    IGReview.mount({ onSaveDraft: function () { saveExam(true); } });
+</script>
+</body>
+</html>

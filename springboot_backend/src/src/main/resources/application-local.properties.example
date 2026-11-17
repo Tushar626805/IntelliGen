@@ -1,0 +1,7 @@
+# Copy this file to application-local.properties and fill in your own values.
+# Never commit or share application-local.properties.
+
+spring.datasource.username=YOUR_DB_USERNAME
+spring.datasource.password=YOUR_DB_PASSWORD
+spring.mail.username=YOUR_EMAIL@gmail.com
+spring.mail.password=YOUR_GMAIL_APP_PASSWORD

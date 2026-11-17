@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script src="api.js"></script>
+    <script src="auth-ui.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Account | IntelliGen</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="theme.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="ui.js"></script>
+</head>
+<body>
+<div class="auth-grid">
+
+    <aside class="auth-aside">
+        <div class="flex items-center gap-3">
+            <div class="brand-mark"><i class="fa-solid fa-brain"></i></div>
+            <span class="auth-brand-name">IntelliGen</span>
+        </div>
+        <div>
+            <h2 class="leading-tight tracking-tight">Create Your IntelliGen Account</h2>
+            <p class="mt-4 text-sm leading-relaxed max-w-md">Students and teachers are approved by their department head, principals by the system administrator. You can sign in once your account is approved.</p>
+            <div class="mt-10 space-y-6 max-w-md">
+                <div class="auth-feature"><div class="af-icon"><i class="fa-solid fa-user-check"></i></div>
+                    <div><h3>Approval-Based Access</h3><p>Each college and branch keeps its own isolated data.</p></div></div>
+                <div class="auth-feature"><div class="af-icon"><i class="fa-solid fa-shield-halved"></i></div>
+                    <div><h3>Role-Specific Workspaces</h3><p>You only see the tools that belong to your role.</p></div></div>
+            </div>
+        </div>
+        <p class="text-xs" style="color:#8fa2c6">&copy; IntelliGen &middot; AI-Powered Adaptive Examination Platform</p>
+    </aside>
+
+    <main class="auth-main">
+        <div class="auth-card auth-card-wide py-4">
+            <div class="flex items-center gap-3 mb-8 lg:hidden">
+                <div class="brand-mark"><i class="fa-solid fa-brain"></i></div>
+                <span class="text-lg font-bold text-slate-900">IntelliGen</span>
+            </div>
+
+            <h1>Create Your Account</h1>
+            <p class="auth-sub">Tell us a little about yourself to get started.</p>
+
+            <form onsubmit="handleRegister(event)" class="mt-8 space-y-5">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div><label for="regName" class="field-label">Full Name</label><input type="text" id="regName" required autocomplete="name" class="field-input"></div>
+                    <div><label for="regEmail" class="field-label">Email Address</label><input type="email" id="regEmail" required autocomplete="username" class="field-input" placeholder="name@college.edu"></div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div>
+                        <label for="regPassword" class="field-label">Password</label>
+                        <input type="password" id="regPassword" required minlength="8" maxlength="72" autocomplete="new-password" class="field-input" aria-describedby="regPasswordHint">
+                        <p id="regPasswordHint" class="field-hint">Use 8 to 72 characters.</p>
+                                    </div>
+                    <div><label for="regCollege" class="field-label">College Name</label><input type="text" id="regCollege" required class="field-input"></div>
+                </div>
+
+                <div>
+                    <label for="roleSelect" class="field-label">Select Your Role</label>
+                    <select id="roleSelect" onchange="toggleDynamicFields()" required class="field-input cursor-pointer">
+                        <option value="" disabled selected>Choose a Role</option>
+                        <option value="STUDENT">Student</option>
+                        <option value="TEACHER">Teacher</option>
+                        <option value="PRINCIPAL">Principal</option>
+                    </select>
+                </div>
+
+                <div id="dynamicFields" class="bg-slate-50 p-5 rounded-xl border border-slate-200 hidden space-y-4">
+                    <div id="deptContainer" class="hidden">
+                        <label for="regDept" class="field-label">Department or Branch</label>
+                        <input type="text" id="regDept" class="field-input" placeholder="e.g. Computer Science">
+                    </div>
+
+                    <div id="studentFields" class="grid grid-cols-1 sm:grid-cols-2 gap-4 hidden">
+                        <div><label for="regRoll" class="field-label">Roll Number</label><input type="text" id="regRoll" class="field-input"></div>
+                        <div>
+                            <label for="regSemester" class="field-label">Semester</label>
+                            <select id="regSemester" class="field-input">
+                                <option value="">Choose a Semester</option><option value="1">Semester 1</option><option value="2">Semester 2</option><option value="3">Semester 3</option><option value="4">Semester 4</option><option value="5">Semester 5</option><option value="6">Semester 6</option><option value="7">Semester 7</option><option value="8">Semester 8</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="teacherFields" class="hidden space-y-4">
+                        <div>
+                            <label for="regEmpId" class="field-label">Employee ID</label>
+                            <input type="text" id="regEmpId" class="field-input">
+                        </div>
+                        <div>
+                            <label for="regSubjects" class="field-label">Subjects Taught</label>
+                            <input type="text" id="regSubjects" class="field-input" placeholder="e.g. Database Systems, Machine Learning">
+                            <p class="text-xs text-slate-400 mt-1.5">Separate multiple subjects with commas.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="errorMsg" role="alert" class="hidden flex items-start gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+                    <i class="fa-solid fa-circle-exclamation mt-0.5"></i><span id="errorText"></span>
+                </div>
+                <div id="successMsg" role="status" class="hidden flex items-start gap-2 text-sm text-green-800 bg-green-50 border border-green-200 rounded-lg p-3">
+                    <i class="fa-solid fa-circle-check mt-0.5"></i><span id="successText"></span>
+                </div>
+
+                <button type="submit" id="submitBtn" class="btn btn-primary btn-lg w-full">Create Account</button>
+            </form>
+
+            <p class="text-center text-slate-500 mt-8 text-sm">Already have an account? <a href="login.html" class="link">Sign In</a></p>
+        </div>
+    </main>
+</div>
+
+<script>
+    function toggleDynamicFields() {
+        const role = document.getElementById('roleSelect').value;
+        const container = document.getElementById('dynamicFields');
+        document.getElementById('deptContainer').classList.add('hidden'); document.getElementById('studentFields').classList.add('hidden'); document.getElementById('teacherFields').classList.add('hidden');
+
+        document.getElementById('regDept').required = false; document.getElementById('regRoll').required = false; document.getElementById('regSemester').required = false; document.getElementById('regEmpId').required = false;
+
+        if(role === 'PRINCIPAL') { container.classList.add('hidden'); return; }
+        container.classList.remove('hidden'); document.getElementById('deptContainer').classList.remove('hidden'); document.getElementById('regDept').required = true;
+
+        if (role === 'STUDENT') { document.getElementById('studentFields').classList.remove('hidden'); document.getElementById('regRoll').required = true; document.getElementById('regSemester').required = true; }
+        else if (role === 'TEACHER') { document.getElementById('teacherFields').classList.remove('hidden'); document.getElementById('regEmpId').required = true; }
+    }
+
+    function showError(message) {
+        document.getElementById('successMsg').classList.add('hidden');
+        document.getElementById('errorText').innerText = message;
+        document.getElementById('errorMsg').classList.remove('hidden');
+    }
+
+    async function handleRegister(event) {
+        event.preventDefault();
+        const btn = document.getElementById('submitBtn');
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating Account...'; btn.disabled = true;
+        document.getElementById('errorMsg').classList.add('hidden');
+
+        const role = document.getElementById('roleSelect').value;
+        const payload = {
+            name: document.getElementById('regName').value, username: document.getElementById('regEmail').value,
+            password: document.getElementById('regPassword').value, collegeName: document.getElementById('regCollege').value, role: role
+        };
+
+        if (role === 'STUDENT') {
+            payload.departmentName = document.getElementById('regDept').value; payload.rollNo = document.getElementById('regRoll').value; payload.currentSemester = parseInt(document.getElementById('regSemester').value);
+        } else if (role === 'TEACHER') {
+            payload.departmentName = document.getElementById('regDept').value; payload.employeeId = document.getElementById('regEmpId').value;
+            payload.subjects = document.getElementById('regSubjects').value; // Collect Subjects
+        }
+
+        let registered = false;
+        try {
+            const response = await fetch('/api/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            let data = null;
+            try { data = await response.json(); } catch (e) { data = null; }   // error pages may not be JSON
+            if (response.ok) {
+                registered = true;
+                document.getElementById('successText').innerText = ((data && data.message) || 'Account created.') + ' Redirecting to sign in...';
+                document.getElementById('successMsg').classList.remove('hidden');
+                setTimeout(() => window.location.replace('login.html'), 2200);
+            } else { showError((data && data.error) || (response.status === 429 ? 'Too many attempts. Please wait a few minutes and try again.' : 'Registration failed (status ' + response.status + '). Please try again.')); }
+        } catch (error) { showError("Could not reach the server. Please check your connection and try again."); }
+        finally { if (!registered) { btn.innerHTML = 'Create Account'; btn.disabled = false; } }
+    }
+</script>
+</body>
+</html>

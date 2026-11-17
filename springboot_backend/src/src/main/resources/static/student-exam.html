@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script src="api.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Portal | IntelliGen</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="theme.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="ui.js"></script>
+    <script src="notifications.js"></script>
+    <script src="layout.js"></script>
+    <script>
+        const u = JSON.parse(localStorage.getItem('currentUser'));
+        if (!u || u.role !== 'STUDENT') window.location.replace('login.html');
+    </script>
+</head>
+<body class="text-slate-800 antialiased">
+
+<main id="igContent">
+    <!-- ================= OVERVIEW ================= -->
+    <div id="view-overview">
+        <div class="page-header">
+            <h1 class="page-title" id="welcomeTitle">Welcome Back</h1>
+            <p class="page-sub" id="welcomeMsg"></p>
+        </div>
+
+        <section class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8" aria-label="Summary">
+            <div class="ui-card stat-card"><div class="stat-icon"><i class="fa-solid fa-play"></i></div><div><p id="statOpen" class="stat-value">&ndash;</p><p class="stat-label">Open Now</p></div></div>
+            <div class="ui-card stat-card"><div class="stat-icon"><i class="fa-solid fa-circle-check"></i></div><div><p id="statCompleted" class="stat-value">&ndash;</p><p class="stat-label">Completed</p></div></div>
+            <div class="ui-card stat-card"><div class="stat-icon"><i class="fa-solid fa-chart-line"></i></div><div><p id="statAverage" class="stat-value">&ndash;</p><p class="stat-label">Average Score</p></div></div>
+            <div class="ui-card stat-card"><div class="stat-icon"><i class="fa-solid fa-clock-rotate-left"></i></div><div><p id="statMissed" class="stat-value">&ndash;</p><p class="stat-label">Missed</p></div></div>
+        </section>
+
+        <div class="grid grid-cols-1 xl:grid-cols-5 gap-6 mb-6">
+            <section class="xl:col-span-3 ui-card p-5">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-base font-semibold text-slate-900">Coming Up</h2>
+                    <button type="button" class="rv-link" onclick="switchTab('exams')">See All</button>
+                </div>
+                <div id="upcomingList" class="space-y-3"><div class="skeleton" style="height:64px"></div></div>
+            </section>
+            <section class="xl:col-span-2 ui-card p-5">
+                <h2 class="text-base font-semibold text-slate-900 mb-1">Study Suggestions</h2>
+                <p class="text-xs text-slate-400 mb-4">Based only on your results so far.</p>
+                <div id="suggestions" class="space-y-3"><div class="skeleton" style="height:64px"></div></div>
+            </section>
+        </div>
+
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <section class="ui-card p-5">
+                <h2 class="text-base font-semibold text-slate-900 mb-4">Score Trend</h2>
+                <div id="trendChart"></div>
+            </section>
+            <section class="ui-card p-5">
+                <h2 class="text-base font-semibold text-slate-900 mb-4">Progress by Subject</h2>
+                <div id="subjectBars" class="space-y-4"></div>
+            </section>
+        </div>
+    </div>
+
+    <!-- ================= EXAMS ================= -->
+    <div id="view-exams" class="hidden">
+        <div class="page-header"><h1 class="page-title">My Exams</h1><p class="page-sub">Exams for your class. Your answers are saved automatically while you sit an exam.</p></div>
+        <h2 class="text-base font-semibold text-slate-900 mb-3">Open and Upcoming</h2>
+        <div id="availableExams" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-8"></div>
+        <h2 class="text-base font-semibold text-slate-900 mb-3">Missed</h2>
+        <div id="missedExams" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+    </div>
+
+    <!-- ================= RESULTS ================= -->
+    <div id="view-results" class="hidden">
+        <div class="page-header"><h1 class="page-title">My Results</h1><p class="page-sub">Scores for every exam you have completed.</p></div>
+        <div class="flex flex-col sm:flex-row gap-3 mb-4">
+            <input id="resSearch" type="search" class="field-input sm:max-w-xs" placeholder="Search by exam title" aria-label="Search results by exam title" oninput="renderResults()">
+            <select id="resSubject" class="rv-select" aria-label="Filter by subject" onchange="renderResults()"><option value="">All Subjects</option></select>
+            <label class="text-xs text-slate-500 flex items-center gap-2">From <input id="resFrom" type="date" class="rv-select" onchange="renderResults()"></label>
+            <label class="text-xs text-slate-500 flex items-center gap-2">To <input id="resTo" type="date" class="rv-select" onchange="renderResults()"></label>
+        </div>
+        <div id="pastResults" class="space-y-3"></div>
+    </div>
+</main>
+
+<div id="reviewOverlay" class="rvw-overlay hidden">
+    <div id="reviewBox" class="rvw-box" role="dialog" aria-modal="true" aria-labelledby="reviewTitle" tabindex="-1">
+        <div class="rvw-head">
+            <div class="min-w-0">
+                <h2 id="reviewTitle">Answer Review</h2>
+                <p id="reviewSub" class="page-sub"></p>
+            </div>
+            <button type="button" id="reviewClose" class="rvw-close" aria-label="Close Answer Review" onclick="closeReview()"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+        </div>
+        <div id="reviewSummary"></div>
+        <div id="reviewFilter"></div>
+        <div id="reviewBody" class="rvw-body"></div>
+    </div>
+</div>
+
+<script>
+    const user = JSON.parse(localStorage.getItem('currentUser'));
+    const esc = IGUI.esc;
+    const PASS_MARK = 40, WEAK_BELOW = 60;
+    const state = { open: [], missed: [], results: [], loaded: { exams: false, results: false } };
+    const examsById = {};
+
+    IGLayout.mount({
+        role: 'Student', contextId: 'studentCtx',
+        nav: [
+            { id: 'tab-overview', icon: 'fa-gauge-high', label: 'Overview', onclick: "switchTab('overview')", active: true },
+            { id: 'tab-exams', icon: 'fa-file-pen', label: 'My Exams', onclick: "switchTab('exams')" },
+            { id: 'tab-results', icon: 'fa-square-poll-vertical', label: 'My Results', onclick: "switchTab('results')" }
+        ]
+    });
+    const ctx = document.getElementById('studentCtx');
+    if (ctx) ctx.innerText = user.rollNo ? `Roll No. ${user.rollNo}` : (user.departmentName || '');
+    document.getElementById('welcomeTitle').innerText = `Welcome Back, ${(user.username || 'student').split(' ')[0]}`;
+    document.getElementById('welcomeMsg').innerText = [user.departmentName, user.collegeName].filter(Boolean).join(' \u00b7 ');
+
+    function switchTab(tab) {
+        ['overview', 'exams', 'results'].forEach(t => {
+            document.getElementById('view-' + t).classList.toggle('hidden', t !== tab);
+            const btn = document.getElementById('tab-' + t);
+            if (btn) { btn.classList.toggle('tab-active', t === tab); btn.classList.toggle('tab-inactive', t !== tab); }
+        });
+    }
+
+    // ---------------------------------------------------------------- helpers
+    const pctOf = r => r.totalMarks > 0 ? Math.round((r.marksObtained / r.totalMarks) * 100) : 0;
+    const subjectOf = r => (r.subjectName && r.subjectName !== 'null') ? r.subjectName : 'General';
+    const fmt = d => d ? new Date(d).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '';
+
+    function timeLeft(end) {
+        const ms = new Date(end) - new Date();
+        if (ms <= 0) return 'closed';
+        const mins = Math.floor(ms / 60000), h = Math.floor(mins / 60), d = Math.floor(h / 24);
+        return d >= 1 ? `${d} day${d > 1 ? 's' : ''} left` : h >= 1 ? `${h} h ${mins % 60} min left` : `${mins} min left`;
+    }
+    function examState(e) {
+        const now = new Date();
+        if (e.startTime && new Date(e.startTime) > now) return { open: false, label: 'Starts ' + fmt(e.startTime), cls: 'badge-slate' };
+        return { open: true, label: e.endTime ? 'Closes in ' + timeLeft(e.endTime).replace(' left', '') : 'Open now', cls: 'badge-green' };
+    }
+
+    // ---------------------------------------------------------------- exams
+    function examCard(e) {
+        const st = examState(e);
+        return `<article class="ui-card ui-card-hover p-5 flex flex-col">
+            <div class="flex items-center justify-between gap-2"><span class="badge badge-blue">${esc(e.subjectName || 'General subject')}</span><span class="badge ${st.cls}">${esc(st.label)}</span></div>
+            <h3 class="font-semibold text-slate-900 mt-3 leading-snug">${esc(e.title)}</h3>
+            <p class="text-sm text-slate-500 mt-2 mb-4"><i class="fa-regular fa-clock mr-2 text-slate-400"></i>${esc(e.durationMinutes || 30)} minutes${e.endTime ? ' &middot; closes ' + esc(fmt(e.endTime)) : ''}</p>
+            ${st.open ? `<button onclick="takeExam(${Number(e.id)})" class="btn btn-primary w-full mt-auto">Start Exam <i class="fa-solid fa-arrow-right"></i></button>`
+                      : `<button class="btn btn-secondary w-full mt-auto" disabled>Not Open Yet</button>`}
+        </article>`;
+    }
+
+    function renderExamViews() {
+        const open = state.open;
+        document.getElementById('statOpen').innerText = open.filter(e => examState(e).open).length;
+        document.getElementById('statMissed').innerText = state.missed.length;
+
+        const upcoming = open.slice().sort((a, b) => new Date(a.endTime || '2999-01-01') - new Date(b.endTime || '2999-01-01')).slice(0, 3);
+        document.getElementById('upcomingList').innerHTML = upcoming.length ? upcoming.map(e => {
+            const st = examState(e);
+            return `<div class="flex items-center justify-between gap-3 border border-slate-100 rounded-xl p-3">
+                <div class="min-w-0"><p class="font-semibold text-slate-900 truncate">${esc(e.title)}</p>
+                <p class="text-xs text-slate-500 mt-0.5">${esc(e.subjectName || 'General')} &middot; ${esc(st.label)}</p></div>
+                ${st.open ? `<button class="btn btn-primary btn-sm shrink-0" onclick="takeExam(${Number(e.id)})">Start</button>` : ''}</div>`;
+        }).join('') : IGUI.empty({ icon: 'fa-file-circle-check', title: 'Nothing Due', text: 'New exams for your class will appear here.' });
+
+        document.getElementById('availableExams').innerHTML = open.length ? open.map(examCard).join('')
+            : IGUI.empty({ icon: 'fa-file-circle-check', title: 'No Exams Available', text: 'There are no active exams for your class right now.' });
+        document.getElementById('missedExams').innerHTML = state.missed.length ? state.missed.map(e => `
+            <article class="ui-card p-5"><span class="badge badge-red">Missed</span>
+            <h3 class="font-semibold text-slate-900 mt-3">${esc(e.title)}</h3>
+            <p class="text-sm text-slate-500 mt-1">${esc(e.subjectName || 'General')} &middot; closed ${esc(fmt(e.endTime))}</p></article>`).join('')
+            : IGUI.empty({ icon: 'fa-circle-check', title: 'No Missed Exams', text: 'Great, you have not missed any exam.' });
+        renderSuggestions();
+    }
+
+    async function loadExams() {
+        const showErr = (id, text) => { document.getElementById(id).innerHTML = IGUI.empty({ error: true, icon: 'fa-circle-exclamation', title: 'Could Not Load Exams', text, retry: 'loadExams()' }); };
+        try {
+            const [aRes, mRes] = await Promise.all([fetch('/api/exam/student/available'), fetch('/api/exam/student/missed')]);
+            if (!aRes.ok) {
+                let msg = 'Failed to load exams.'; try { msg = (await aRes.json()).error || msg; } catch (e) { /* ignore */ }
+                ['availableExams', 'upcomingList'].forEach(id => showErr(id, msg)); return;
+            }
+            const all = await aRes.json();
+            state.missed = mRes.ok ? await mRes.json() : [];
+            all.forEach(e => { examsById[e.id] = e; });
+            state.allAvailable = Array.isArray(all) ? all : [];
+            state.loaded.exams = true;
+            applyExamState();
+        } catch (err) { ['availableExams', 'upcomingList'].forEach(id => showErr(id, 'Could not reach the server. Check that the backend is running.')); }
+    }
+
+    // Open = not yet completed and not past its deadline
+    function applyExamState() {
+        if (!state.loaded.exams) return;
+        const done = new Set(state.results.map(r => r.examId));
+        const now = new Date();
+        state.open = (state.allAvailable || []).filter(e => !done.has(e.id) && (!e.endTime || new Date(e.endTime) > now));
+        renderExamViews();
+    }
+
+    // ---------------------------------------------------------------- results
+    async function loadResults() {
+        try {
+            const res = await fetch('/api/exam/results/student/me');
+            if (!res.ok) throw new Error('bad status');
+            const list = await res.json();
+            state.results = (Array.isArray(list) ? list : []).sort((a, b) => new Date(a.submissionTime) - new Date(b.submissionTime));
+            state.loaded.results = true;
+            const subjects = [...new Set(state.results.map(subjectOf))].sort();
+            document.getElementById('resSubject').innerHTML = '<option value="">All Subjects</option>' + subjects.map(s => `<option>${esc(s)}</option>`).join('');
+            const pcts = state.results.map(pctOf);
+            document.getElementById('statCompleted').innerText = state.results.length;
+            document.getElementById('statAverage').innerText = pcts.length ? Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length) + '%' : '\u2013';
+            renderResults(); renderTrend(); renderSubjects(); applyExamState(); renderSuggestions();
+        } catch (err) {
+            ['pastResults', 'trendChart', 'subjectBars'].forEach(id => { document.getElementById(id).innerHTML = IGUI.empty({ error: true, icon: 'fa-plug-circle-xmark', title: 'Could Not Load Results', retry: 'loadResults()' }); });
+        }
+    }
+
+    // ---------------------------------------------------------------- answer review
+    // The server decides when answers are released (after the exam window closes) and only ever sends the answer
+    // key to a student who has submitted that exam. This page just displays what it is given.
+    const review = { data: null, filter: 'all', opener: null };
+
+    function reviewAction(r) {
+        if (r.answersReleased) {
+            return `<button type="button" class="btn btn-secondary btn-sm mt-3" onclick="openReview(${Number(r.examId)})"><i class="fa-solid fa-list-check" aria-hidden="true"></i> Review Answers</button>`;
+        }
+        return `<p class="text-xs mt-3" style="color:var(--muted)"><i class="fa-regular fa-clock" aria-hidden="true"></i> Correct answers will be available once your teacher releases them.</p>`;
+    }
+
+    function focusEl(el) { if (el && typeof el.focus === 'function') el.focus(); }
+    const normAnswer = s => String(s == null ? '' : s).trim().toLowerCase();
+
+    async function openReview(examId) {
+        review.opener = document.activeElement || null;
+        review.data = null; review.filter = 'all';
+        document.getElementById('reviewTitle').innerText = 'Answer Review';
+        document.getElementById('reviewSub').innerText = '';
+        document.getElementById('reviewSummary').innerHTML = '';
+        document.getElementById('reviewFilter').innerHTML = '';
+        document.getElementById('reviewBody').innerHTML = IGUI.skeletonCards(2);
+        document.getElementById('reviewOverlay').classList.remove('hidden');
+        if (document.body) document.body.style.overflow = 'hidden';
+        focusEl(document.getElementById('reviewBox'));
+        try {
+            const res = await fetch('/api/exam/student/review/' + encodeURIComponent(examId));
+            let data = null;
+            try { data = await res.json(); } catch (e) { data = null; }
+            if (!res.ok || !data) throw new Error((data && data.error) || 'The answer review could not be loaded.');
+            review.data = data;
+            renderReview();
+        } catch (err) {
+            document.getElementById('reviewBody').innerHTML = IGUI.empty({ error: true, icon: 'fa-plug-circle-xmark', title: 'Could Not Load Answer Review', text: err.message || 'Please try again.' });
+        }
+    }
+
+    function closeReview() {
+        document.getElementById('reviewOverlay').classList.add('hidden');
+        if (document.body) document.body.style.overflow = '';
+        const opener = review.opener; review.opener = null; review.data = null;
+        focusEl(opener);
+    }
+
+    function setReviewFilter(f) { review.filter = f; renderReview(); }
+
+    function renderReview() {
+        const d = review.data; if (!d) return;
+        document.getElementById('reviewTitle').innerText = 'Answer Review';
+        document.getElementById('reviewSub').innerText = [d.examTitle, d.subjectName].filter(Boolean).join(' \u00b7 ');
+
+        if (!d.released) {
+            document.getElementById('reviewSummary').innerHTML = '';
+            document.getElementById('reviewFilter').innerHTML = '';
+            document.getElementById('reviewBody').innerHTML = IGUI.empty({ icon: 'fa-clock', title: 'Answers Are Not Available Yet',
+                text: d.message || 'Your teacher has not released the correct answers yet.' });
+            return;
+        }
+
+        const qs = Array.isArray(d.questions) ? d.questions : [];
+        const recorded = d.answersRecorded !== false;
+        const answered = q => q.yourAnswer != null && String(q.yourAnswer).trim() !== '';
+        const right = qs.filter(q => recorded && q.isCorrect).length;
+        const wrong = qs.filter(q => recorded && answered(q) && !q.isCorrect).length;
+        const skipped = qs.filter(q => recorded && !answered(q)).length;
+
+        document.getElementById('reviewSummary').innerHTML = `<div class="rvw-summary">
+            <div><span class="rvw-stat">${esc(d.marksObtained)}/${esc(d.totalMarks)}</span><span class="rvw-stat-label">Score</span></div>
+            ${recorded ? `<div><span class="rvw-stat">${right}</span><span class="rvw-stat-label">Correct</span></div>
+            <div><span class="rvw-stat">${wrong}</span><span class="rvw-stat-label">Incorrect</span></div>
+            <div><span class="rvw-stat">${skipped}</span><span class="rvw-stat-label">Not Answered</span></div>` : ''}</div>
+            ${recorded ? '' : '<p class="rvw-notice" role="note"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> No saved answers were found for this attempt, so only the correct answers are shown. Your score above is unchanged.</p>'}`;
+
+        document.getElementById('reviewFilter').innerHTML = recorded ? `<div class="rvw-filter" role="group" aria-label="Filter Questions">
+            <button type="button" class="btn btn-sm ${review.filter === 'all' ? 'btn-primary' : 'btn-secondary'}" aria-pressed="${review.filter === 'all'}" onclick="setReviewFilter('all')">All Questions (${qs.length})</button>
+            <button type="button" class="btn btn-sm ${review.filter === 'wrong' ? 'btn-primary' : 'btn-secondary'}" aria-pressed="${review.filter === 'wrong'}" onclick="setReviewFilter('wrong')">Incorrect or Skipped (${wrong + skipped})</button></div>` : '';
+
+        if (!qs.length) { document.getElementById('reviewBody').innerHTML = IGUI.empty({ icon: 'fa-circle-question', title: 'No Questions Found', text: 'This exam has no questions to review.' }); return; }
+
+        const shown = qs.map((q, i) => ({ q, i })).filter(x => review.filter !== 'wrong' || !recorded || !x.q.isCorrect);
+        document.getElementById('reviewBody').innerHTML = shown.length ? shown.map(({ q, i }) => reviewCard(q, i, recorded, answered(q))).join('')
+            : IGUI.empty({ icon: 'fa-circle-check', title: 'No Incorrect Answers', text: 'Every question was answered correctly.' });
+    }
+
+    function reviewCard(q, i, recorded, answered) {
+        const opts = Array.isArray(q.options) ? q.options : [];
+        const correctN = normAnswer(q.correctAnswer), yourN = normAnswer(q.yourAnswer);
+        let state, badge;
+        if (!recorded) { state = 'is-unknown'; badge = '<span class="badge badge-slate">Answer Not Recorded</span>'; }
+        else if (!answered) { state = 'is-skipped'; badge = '<span class="badge badge-amber">Not Answered</span>'; }
+        else if (q.isCorrect) { state = 'is-correct'; badge = '<span class="badge badge-green"><i class="fa-solid fa-check" aria-hidden="true"></i> Correct</span>'; }
+        else { state = 'is-wrong'; badge = '<span class="badge badge-red"><i class="fa-solid fa-xmark" aria-hidden="true"></i> Incorrect</span>'; }
+
+        const matchedCorrect = opts.some(o => normAnswer(o) === correctN);
+        const matchedYours = answered && opts.some(o => normAnswer(o) === yourN);
+        const optHtml = opts.map((o, k) => {
+            const isKey = correctN && normAnswer(o) === correctN;
+            const isYours = answered && normAnswer(o) === yourN;
+            const cls = isKey ? 'is-key' : (isYours ? 'is-yours-wrong' : '');
+            const tags = (isKey ? '<span class="rvw-tag rvw-tag-correct"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> Correct Answer</span>' : '')
+                + (isYours ? `<span class="rvw-tag ${q.isCorrect ? 'rvw-tag-correct' : 'rvw-tag-wrong'}"><i class="fa-solid fa-user" aria-hidden="true"></i> Your Answer</span>` : '');
+            return `<li class="rvw-opt ${cls}"><span class="rvw-key" aria-hidden="true">${String.fromCharCode(65 + (k % 26))}</span><span class="rvw-opt-text">${esc(o)}</span>${tags}</li>`;
+        }).join('');
+
+        return `<article class="rvw-q ${state}">
+            <div class="rvw-q-head"><h3>Question ${i + 1}</h3>${badge}<span class="rvw-marks">${esc(q.marksAwarded)}/${esc(q.marks)} ${Number(q.marks) === 1 ? 'Mark' : 'Marks'}</span></div>
+            <p class="rvw-q-text">${esc(q.questionText)}</p>
+            <ul class="rvw-opts">${optHtml}</ul>
+            ${!matchedCorrect && q.correctAnswer ? `<p class="rvw-note"><strong>Correct answer:</strong> ${esc(q.correctAnswer)}</p>` : ''}
+            ${answered && !matchedYours ? `<p class="rvw-note"><strong>Your answer:</strong> ${esc(q.yourAnswer)}</p>` : ''}
+            ${recorded && !answered ? '<p class="rvw-note">You did not answer this question.</p>' : ''}
+        </article>`;
+    }
+
+    if (document.addEventListener) {
+        document.addEventListener('keydown', function (e) {
+            const overlay = document.getElementById('reviewOverlay');
+            if (!overlay || overlay.classList.contains('hidden')) return;
+            if (e.key === 'Escape') { closeReview(); return; }
+            if (e.key === 'Tab') {                       // keep keyboard focus inside the dialog
+                const f = Array.from(document.getElementById('reviewBox').querySelectorAll('button, [href], [tabindex]:not([tabindex="-1"])'));
+                if (!f.length) return;
+                const first = f[0], last = f[f.length - 1];
+                if (e.shiftKey && (document.activeElement === first || document.activeElement === document.getElementById('reviewBox'))) { e.preventDefault(); last.focus(); }
+                else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+            }
+        });
+    }
+
+    function renderResults() {
+        const q = document.getElementById('resSearch').value.trim().toLowerCase();
+        const subj = document.getElementById('resSubject').value;
+        const from = document.getElementById('resFrom').value ? new Date(document.getElementById('resFrom').value + 'T00:00:00') : null;
+        const to = document.getElementById('resTo').value ? new Date(document.getElementById('resTo').value + 'T23:59:59') : null;
+        const inRange = r => { if (!from && !to) return true; const d = r.submissionTime ? new Date(r.submissionTime) : null; return !!d && (!from || d >= from) && (!to || d <= to); };
+        const rows = state.results.slice().reverse().filter(r => (!q || (r.examTitle || '').toLowerCase().includes(q)) && (!subj || subjectOf(r) === subj) && inRange(r));
+        document.getElementById('pastResults').innerHTML = rows.length ? rows.map(r => {
+            const pct = pctOf(r), pass = pct >= PASS_MARK;
+            return `<div class="ui-card p-4 flex justify-between items-center gap-3">
+                <div class="min-w-0"><h2 class="font-semibold text-slate-900 truncate">${esc(r.examTitle)}</h2>
+                <p class="text-xs text-slate-400 mt-1">${esc(subjectOf(r))} &middot; ${r.submissionTime ? esc(new Date(r.submissionTime).toLocaleDateString()) : ''}</p>
+                ${reviewAction(r)}</div>
+                <div class="text-right shrink-0"><p class="text-lg font-bold text-slate-800">${esc(r.marksObtained)}<span class="text-sm text-slate-400 font-medium">/${esc(r.totalMarks)}</span></p>
+                <span class="badge ${pass ? 'badge-green' : 'badge-red'}">${pct}% &middot; ${pass ? 'Pass' : 'Fail'}</span></div></div>`;
+        }).join('') : IGUI.empty({ icon: 'fa-clipboard-list', title: state.results.length ? 'No matching results' : 'No results yet', text: state.results.length ? 'Try a different search, subject or date range.' : 'Your scores will show up here after you complete an exam.' });
+    }
+
+    function renderTrend() {
+        const box = document.getElementById('trendChart');
+        const pts = state.results.map(pctOf);
+        if (pts.length < 2) { box.innerHTML = IGUI.empty({ icon: 'fa-chart-line', title: 'Not Enough Data Yet', text: 'Complete at least two exams to see your trend.' }); return; }
+        const W = 320, H = 130, pad = 18, x = i => pad + i * ((W - 2 * pad) / (pts.length - 1)), y = p => H - pad - (p / 100) * (H - 2 * pad);
+        const line = pts.map((p, i) => `${x(i).toFixed(1)},${y(p).toFixed(1)}`).join(' ');
+        box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" class="w-full" role="img" aria-label="Your scores over time: ${pts.map(p => p + '%').join(', ')}">
+            <line x1="${pad}" x2="${W - pad}" y1="${y(PASS_MARK)}" y2="${y(PASS_MARK)}" stroke="#fca5a5" stroke-dasharray="4 4"/>
+            <text x="${W - pad}" y="${y(PASS_MARK) - 4}" text-anchor="end" font-size="9" fill="#ef4444">pass mark ${PASS_MARK}%</text>
+            <polyline points="${line}" fill="none" stroke="#1f4e96" stroke-width="2.5" stroke-linejoin="round"/>
+            ${pts.map((p, i) => `<circle cx="${x(i)}" cy="${y(p)}" r="3.5" fill="#1f4e96"><title>${esc(state.results[i].examTitle)}: ${p}%</title></circle>`).join('')}</svg>
+            <p class="text-xs text-slate-400 mt-2">Latest: <strong class="text-slate-700">${pts[pts.length - 1]}%</strong> &middot; ${pts.length} exams</p>`;
+    }
+
+    function subjectStats() {
+        const m = {};
+        state.results.forEach(r => { const s = subjectOf(r); (m[s] = m[s] || []).push(pctOf(r)); });
+        return Object.keys(m).map(s => ({ subject: s, n: m[s].length, avg: Math.round(m[s].reduce((a, b) => a + b, 0) / m[s].length) })).sort((a, b) => a.avg - b.avg);
+    }
+
+    function renderSubjects() {
+        const stats = subjectStats();
+        document.getElementById('subjectBars').innerHTML = stats.length ? stats.map(s => `
+            <div><div class="flex justify-between text-sm mb-1"><span class="font-medium text-slate-700">${esc(s.subject)} <span class="text-slate-400 font-normal">(${s.n} exam${s.n > 1 ? 's' : ''})</span></span><span class="font-semibold text-slate-800">${s.avg}%</span></div>
+            <div class="progress ${s.avg >= 70 ? 'good' : s.avg >= WEAK_BELOW ? 'warn' : 'bad'}" role="progressbar" aria-valuenow="${s.avg}" aria-valuemin="0" aria-valuemax="100" aria-label="${esc(s.subject)} average"><span style="width:${s.avg}%"></span></div></div>`).join('')
+            : IGUI.empty({ icon: 'fa-book-open', title: 'No Subject Data Yet', text: 'Subject progress appears after your first completed exam.' });
+    }
+
+    // Suggestions come only from the student's own results and missed exams (no AI involved)
+    function renderSuggestions() {
+        if (!state.loaded.results || !state.loaded.exams) return;
+        const tips = [];
+        const stats = subjectStats();
+        stats.filter(s => s.avg < WEAK_BELOW).slice(0, 2).forEach(s => tips.push({ icon: 'fa-book', cls: 'text-amber-600', text: `Revise <strong>${esc(s.subject)}</strong>: your average is ${s.avg}% over ${s.n} exam${s.n > 1 ? 's' : ''}.` }));
+        if (state.results.length >= 2) {
+            const last = pctOf(state.results[state.results.length - 1]);
+            const prev = state.results.slice(0, -1).map(pctOf), prevAvg = Math.round(prev.reduce((a, b) => a + b, 0) / prev.length);
+            if (last < prevAvg - 5) tips.push({ icon: 'fa-arrow-trend-down', cls: 'text-red-500', text: `Your latest score (${last}%) is below your earlier average (${prevAvg}%). Review that exam's topics.` });
+            else if (last > prevAvg + 5) tips.push({ icon: 'fa-arrow-trend-up', cls: 'text-green-600', text: `Your latest score (${last}%) is above your earlier average (${prevAvg}%). Keep it up.` });
+        }
+        if (state.missed.length) tips.push({ icon: 'fa-clock-rotate-left', cls: 'text-red-500', text: `You missed ${state.missed.length} exam${state.missed.length > 1 ? 's' : ''}. Ask your teacher if a make-up is possible.` });
+        const soon = state.open.filter(e => examState(e).open && e.endTime && new Date(e.endTime) - new Date() < 48 * 3600000);
+        if (soon.length) tips.push({ icon: 'fa-hourglass-half', cls: 'text-blue-600', text: `${soon.length} exam${soon.length > 1 ? 's close' : ' closes'} within 48 hours.` });
+        if (!tips.length) tips.push({ icon: 'fa-circle-check', cls: 'text-green-600', text: state.results.length ? 'No weak spots found in your results so far.' : 'Complete an exam to get suggestions based on your results.' });
+        document.getElementById('suggestions').innerHTML = tips.map(t => `<div class="flex gap-3 text-sm text-slate-700"><i class="fa-solid ${t.icon} ${t.cls} mt-0.5"></i><p>${t.text}</p></div>`).join('');
+    }
+
+    async function takeExam(id) {
+        const e = examsById[id] || {};
+        const ok = await IGUI.confirm({
+            title: `Start "${e.title || 'this exam'}"?`,
+            message: `You will have ${e.durationMinutes || 30} minutes. The timer starts immediately and cannot be paused. Your answers are saved automatically, and if you get disconnected you can reopen the exam from here and continue where you left off, but the clock keeps running.`,
+            confirmText: 'Start Exam', icon: 'fa-play'
+        });
+        if (ok) window.location.href = `exam-player.html?id=${id}`;
+    }
+
+    loadExams();
+    loadResults();
+</script>
+</body>
+</html>

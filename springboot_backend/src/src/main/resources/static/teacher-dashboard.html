@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script src="api.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teacher Dashboard | IntelliGen</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="theme.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="style.css">
+    <script src="ui.js"></script>
+    <script src="ai-review.js"></script>
+    <script src="list-filter.js"></script>
+    <script src="export.js"></script>
+    <script src="results-table.js"></script>
+    <script src="answer-release.js"></script>
+    <script src="notifications.js"></script>
+    <script src="layout.js"></script>
+
+    <script>
+        function checkAuth() {
+            const userJson = localStorage.getItem('currentUser');
+            if (!userJson) { window.location.replace('login.html'); return false; }
+
+            try {
+                const user = JSON.parse(userJson);
+                if (user.role !== 'TEACHER') { window.location.replace('login.html'); return false; }
+            } catch (e) { window.location.replace('login.html'); return false; }
+            return true;
+        }
+
+        checkAuth();
+        window.addEventListener('pageshow', function(event) {
+            if (event.persisted) checkAuth();
+        });
+    </script>
+</head>
+<body class="text-slate-800 antialiased">
+
+<main id="igContent">
+    <div class="page-header flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <h1 class="page-title">My Exams</h1>
+            <p class="page-sub">Manage your AI-generated assessments and review student performance.</p>
+        </div>
+        <button onclick="openModal('createModal')" class="btn btn-primary btn-lg"><i class="fa-solid fa-plus"></i> Create New Exam</button>
+    </div>
+
+    <section class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8" aria-label="Summary">
+        <div class="ui-card stat-card"><div class="stat-icon"><i class="fa-solid fa-clipboard-list"></i></div>
+            <div><p id="statTotal" class="stat-value">&ndash;</p><p class="stat-label">Total Exams</p></div></div>
+        <div class="ui-card stat-card"><div class="stat-icon"><i class="fa-solid fa-eye"></i></div>
+            <div><p id="statVisible" class="stat-value">&ndash;</p><p class="stat-label">Visible to Students</p></div></div>
+        <div class="ui-card stat-card"><div class="stat-icon"><i class="fa-solid fa-eye-slash"></i></div>
+            <div><p id="statHidden" class="stat-value">&ndash;</p><p class="stat-label">Hidden from Students</p></div></div>
+    </section>
+
+    <div id="examGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"></div>
+</main>
+
+<script>
+    IGLayout.mount({
+        role: 'Teacher', contextId: 'welcomeName',
+        nav: [
+            { id: 'tab-exams', icon: 'fa-clipboard-list', label: 'My Exams', onclick: "window.scrollTo({top:0,behavior:'smooth'})", active: true },
+            { icon: 'fa-circle-plus', label: 'Create Exam', onclick: "openModal('createModal')" }
+        ],
+        tools: [ { icon: 'fa-box-archive', label: 'Archives', onclick: "openModal('archiveModal'); loadArchives()" } ]
+    });
+</script>
+
+<div id="createModal" class="modal-overlay fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto transform transition-all">
+        <div class="p-8 border-b sticky top-0 bg-white z-10 flex justify-between items-center">
+            <h2 id="createModalTitle" class="text-2xl font-bold text-slate-900">Configure New Exam</h2>
+            <button onclick="closeModal('createModal')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-circle-xmark text-2xl"></i></button>
+        </div>
+
+        <div class="p-8">
+            <form id="examForm">
+                <div class="mb-6">
+                    <label class="field-label" for="examTitle">Exam Title</label>
+                    <input type="text" id="examTitle" placeholder="e.g., Mathematics Quiz - Unit 1" class="w-full rounded-xl border border-slate-200 px-4 py-3 focus:ring-2 focus:ring-brand-500 outline-none" required>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div>
+                        <label class="field-label" for="examSubject">Subject Name</label>
+                        <input type="text" id="examSubject" placeholder="e.g., Database Management Systems" class="w-full rounded-xl border border-slate-200 px-4 py-3 focus:ring-2 focus:ring-brand-500 outline-none" required>
+                    </div>
+                    <div>
+                        <label class="field-label" for="targetSemester">Target Semester</label>
+                        <select id="targetSemester" class="w-full rounded-xl border border-slate-200 px-4 py-3 focus:ring-2 focus:ring-brand-500 outline-none bg-white" required>
+                            <option value="">Select Target Semester...</option>
+                            <option value="1">Semester 1</option><option value="2">Semester 2</option>
+                            <option value="3">Semester 3</option><option value="4">Semester 4</option>
+                            <option value="5">Semester 5</option><option value="6">Semester 6</option>
+                            <option value="7">Semester 7</option><option value="8">Semester 8</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                    <div>
+                        <label class="field-label" for="duration">Duration (Mins)</label>
+                        <input type="number" id="duration" value="30" class="w-full rounded-lg border border-slate-200 px-4 py-3 focus:ring-2 focus:ring-brand-500 outline-none" required>
+                    </div>
+                    <div>
+                        <label class="field-label" for="startTime">Start Time</label>
+                        <input type="datetime-local" id="startTime" class="w-full rounded-lg border border-slate-200 px-4 py-3 focus:ring-2 focus:ring-brand-500 outline-none" required>
+                    </div>
+                    <div>
+                        <label class="field-label" for="endTime">End Time</label>
+                        <input type="datetime-local" id="endTime" class="w-full rounded-lg border border-slate-200 px-4 py-3 focus:ring-2 focus:ring-brand-500 outline-none" required>
+                    </div>
+                </div>
+
+                <div class="border-t border-slate-200 my-8"></div>
+                <h2 class="text-lg font-bold text-slate-800 mb-4">Add Questions</h2>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                    <div class="bg-brand-50 p-6 rounded-2xl border border-brand-100">
+                        <h2 class="font-bold text-brand-900 mb-2"><i class="fa-solid fa-wand-magic-sparkles mr-2" aria-hidden="true"></i>Option 1: Auto-Generate with AI</h2>
+                        <p class="text-xs text-slate-600 mb-4">Upload a PDF of your notes and a local AI model will draft multiple-choice questions. Generation can take a few minutes. You review and edit every question before anything is saved or published.</p>
+
+                        <div class="upload-area rounded-xl p-6 text-center bg-white mb-4" onclick="document.getElementById('pdfFile').click()">
+                            <i class="fa-solid fa-cloud-arrow-up text-3xl text-slate-300 mb-2"></i>
+                            <p class="text-slate-600 text-sm font-semibold">Upload PDF</p>
+                            <input type="file" id="pdfFile" accept=".pdf" class="hidden" onchange="updateFileName(this)">
+                        </div>
+                        <p id="fileNameDisplay" class="text-xs text-brand-600 font-bold mb-2 hidden text-center"></p>
+                        <p id="uploadHelp" class="text-xs text-slate-500 mb-4 text-center">PDF files only, up to 20 MB. The PDF must contain readable text: scanned (image-only) PDFs are not supported.</p>
+
+                        <div class="flex flex-wrap items-end gap-3 mb-4">
+                            <div class="rv-qty">
+                                <label for="numQuestions" class="field-label">Number of Questions</label>
+                                <input type="number" id="numQuestions" value="5" min="1" class="field-input" style="width:7rem">
+                            </div>
+                            <!-- ai-review.js inserts the labelled Difficulty selector here -->
+                            <button type="button" onclick="runAI()" id="generateBtn" class="btn btn-primary flex-1">Generate Questions</button>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-50 p-6 rounded-2xl border border-slate-200">
+                        <h2 class="font-bold text-slate-800 mb-2"><i class="fa-solid fa-pen mr-2"></i>Option 2: Add Manually</h2>
+                        <p class="text-xs text-slate-500 mb-4">Type your own custom multiple-choice question.</p>
+
+                        <input type="text" id="manQText" placeholder="Question text..." class="w-full text-sm p-2.5 rounded-lg border mb-2 outline-none">
+                        <div class="grid grid-cols-2 gap-2 mb-2">
+                            <input type="text" id="manOptA" placeholder="Option A" class="text-sm p-2 rounded-lg border outline-none">
+                            <input type="text" id="manOptB" placeholder="Option B" class="text-sm p-2 rounded-lg border outline-none">
+                            <input type="text" id="manOptC" placeholder="Option C" class="text-sm p-2 rounded-lg border outline-none">
+                            <input type="text" id="manOptD" placeholder="Option D" class="text-sm p-2 rounded-lg border outline-none">
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 mb-3">
+                            <select id="manCorrect" class="w-full text-sm p-2.5 rounded-lg border outline-none bg-white">
+                                <option value="">Select Correct Answer...</option>
+                                <option value="A">Option A</option>
+                                <option value="B">Option B</option>
+                                <option value="C">Option C</option>
+                                <option value="D">Option D</option>
+                            </select>
+                            <input type="number" id="manMarks" placeholder="Marks (Default 1)" min="1" value="1" class="w-full text-sm p-2.5 rounded-lg border outline-none">
+                        </div>
+                        <button type="button" onclick="addManualQuestion()" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-2 rounded-lg transition-all text-sm">
+                            Add to Exam
+                        </button>
+                    </div>
+                </div>
+            </form>
+
+            <div id="loadingIndicator" class="hidden text-center py-10">
+                <div class="loader ease-linear rounded-full border-4 border-t-4 border-brand-500 h-10 w-10 mx-auto mb-4"></div>
+                <p class="text-slate-500 text-sm font-medium">AI is generating questions...</p>
+            </div>
+
+            <div id="resultsContainer" class="hidden mt-6">
+                <div class="flex justify-between items-center mb-4 border-b pb-2">
+                    <h2 class="text-lg font-bold text-slate-800">Exam Preview</h2>
+                    <span id="qCountBadge" class="bg-slate-200 text-slate-700 text-xs px-2 py-1 rounded-full font-bold">0 Questions</span>
+                </div>
+
+                <div id="mcqList" class="space-y-4 max-h-[40vh] overflow-y-auto pr-2"></div>
+
+                <button onclick="saveExam()" id="saveBtn" class="mt-8 w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-2xl shadow-lg transition-all flex justify-center items-center text-lg">
+                    <i class="fa-solid fa-check-double mr-2"></i> Save and Publish Exam
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="resultsModal" class="modal-overlay fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col md:flex-row max-h-[90vh]">
+        <div class="w-full md:w-2/3 p-6 flex flex-col">
+            <div class="p-2 border-b bg-white flex justify-between items-center">
+                <h2 id="resModalTitle" class="text-xl font-bold text-slate-800">Student Results</h2>
+                <div>
+                    <button onclick="printResults()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded-lg font-bold text-sm mr-2 transition-colors">
+                        <i class="fa-solid fa-print mr-1"></i> Print
+                    </button>
+                    <button onclick="closeModal('resultsModal')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+                </div>
+            </div>
+            <div class="overflow-y-auto flex-1 p-2">
+                <div id="printableTableArea">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                        <tr class="text-slate-500 text-xs font-bold border-b border-slate-200 bg-slate-50">
+                            <th scope="col" class="p-3">Roll No</th>
+                            <th scope="col" class="p-3">Student Name</th>
+                            <th scope="col" class="p-3 text-right">Score</th>
+                            <th scope="col" class="p-3 text-right">Percentage</th>
+                        </tr>
+                        </thead>
+                        <tbody id="resTableBody" class="divide-y divide-slate-100">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="w-full md:w-1/3 bg-slate-50 p-6 border-l flex flex-col items-center justify-start overflow-y-auto">
+            <h2 class="font-bold text-slate-700 mb-4">Class Performance</h2>
+            <div class="w-48 h-48 mb-6"><canvas id="analyticsChart"></canvas></div>
+            <div id="absentBadge" class="bg-red-50 text-red-700 border border-red-100 font-bold px-4 py-2 rounded-xl text-sm w-full text-center mb-6"></div>
+            <div id="answerReleaseBox"></div>
+
+            <div class="w-full border-t border-slate-200 pt-6">
+                <button onclick="analyzeDifficulty()" id="analyzeBtn" class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-3 rounded-xl font-bold transition-all w-full text-sm shadow-md flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-lightbulb"></i> Identify Hardest Questions
+                </button>
+                <div id="analysisResultArea" class="mt-4 space-y-3 w-full"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="archiveModal" class="modal-overlay fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl w-full max-w-2xl p-8 shadow-2xl transform transition-all">
+        <div class="flex justify-between items-center mb-6 border-b pb-2">
+            <h2 class="text-2xl font-bold text-slate-900"><i class="fa-solid fa-box-archive text-purple-600 mr-2"></i>Your Exam Archives</h2>
+            <button onclick="closeModal('archiveModal')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+        </div>
+        <div id="archiveList" class="space-y-3 max-h-[50vh] overflow-y-auto pr-2"></div>
+        <button onclick="closeModal('archiveModal')" class="mt-6 w-full bg-slate-100 hover:bg-slate-200 py-3 rounded-xl font-bold transition-colors">Close</button>
+    </div>
+</div>
+
+<div id="deleteModal" class="modal-overlay fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 text-center">
+        <div class="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4"><i class="fa-solid fa-triangle-exclamation"></i></div>
+        <h2 class="text-xl font-bold text-slate-900 mb-2">Secure Archive & Delete</h2>
+        <p class="text-sm text-slate-500 mb-4">Enter your profile password to verify. Student records will be permanently bundled into a secure PDF archive before local deletion.</p>
+        <input type="password" id="deletePassword" placeholder="Your Password" class="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-red-500 mb-4">
+        <p id="deleteErr" class="text-red-500 text-sm font-bold hidden mb-4"></p>
+        <div class="flex gap-3">
+            <button onclick="closeModal('deleteModal')" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl transition-colors">Cancel</button>
+            <button onclick="confirmDelete()" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl transition-colors">Archive & Delete</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    function escapeHTML(str) {
+        if (!str) return '';
+        return str.toString()
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    const u = JSON.parse(localStorage.getItem('currentUser'));
+    document.getElementById('welcomeName').innerText = u ? `Welcome, Prof. ${u.username}` : 'Welcome';
+
+    let editingDraftId = null;
+    let currentChart = null;
+    let targetDeleteExamId = null;
+    let currentViewExamId = null;
+
+    function logout() {
+        if (window.IGApi) { window.IGApi.logout(); return; }
+        localStorage.removeItem('currentUser');
+        window.location.replace('login.html');
+    }
+
+    function openModal(id) {
+        document.getElementById(id).classList.remove('hidden');
+        if(id === 'createModal') {
+            IGReview.reset();
+            editingDraftId = null;
+            document.getElementById('createModalTitle').innerText = 'Configure New Exam';
+            document.getElementById('examForm').reset();
+            document.getElementById('fileNameDisplay').classList.add('hidden');
+            renderPreviewList();
+        }
+    }
+
+    function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+    function updateFileName(input) {
+        const display = document.getElementById('fileNameDisplay');
+        if(input.files[0]) {
+            display.innerHTML = `<i class="fa-solid fa-file-pdf mr-1"></i> ${escapeHTML(input.files[0].name)}`;
+            display.classList.remove('hidden');
+        }
+    }
+
+    // --- 1. DASHBOARD LOAD (WITH cleared filters & student toggles) ---
+    async function loadDashboard() {
+        const grid = document.getElementById('examGrid');
+        grid.innerHTML = IGUI.skeletonCards(3);
+
+        try {
+            const res = await fetch('/api/exam/all');
+            const exams = await res.json();
+
+            grid.innerHTML = '';
+
+            // Filters based on creation authority or department parameters
+            const myExams = exams.filter(e => {
+                const iCreatedIt = e.createdByTeacherUsername && e.createdByTeacherUsername === u.email;
+                const iTeachTheSubject = e.departmentName === u.branchName && Array.isArray(u.subjects) && u.subjects.includes(e.subjectName);
+                return iCreatedIt || iTeachTheSubject;
+            });
+
+            const visibleCount = myExams.filter(e => e.visibleToStudents).length;
+            document.getElementById('statTotal').innerText = myExams.length;
+            document.getElementById('statVisible').innerText = visibleCount;
+            document.getElementById('statHidden').innerText = myExams.length - visibleCount;
+
+            if(myExams.length === 0) {
+                grid.innerHTML = IGUI.empty({ icon: 'fa-clipboard-list', title: 'No Exams Yet', text: 'Exams you create, or that are set for the subjects you teach, will appear here.', action: { label: 'Create Your First Exam', onclick: "openModal('createModal')" } });
+                return;
+            }
+
+            myExams.forEach(exam => {
+                const isCreator = exam.createdByTeacherUsername === u.email;
+                const deleteBtn = isCreator ? `<button onclick="openDeleteModal(${exam.id})" class="w-8 h-8 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Secure Archive & Delete" aria-label="Archive and delete exam"><i class="fa-solid fa-trash-can text-base"></i></button>` : '';
+                const isDraft = exam.status === 'DRAFT';
+                const visBtn = (isCreator && !isDraft) ? `<button onclick="toggleVisibility(${exam.id})" class="w-8 h-8 rounded-lg text-slate-400 hover:bg-slate-100 transition-colors" title="Toggle visibility to students" aria-label="Toggle visibility to students"><i class="fa-solid ${exam.visibleToStudents ? 'fa-eye text-blue-500' : 'fa-eye-slash text-slate-400'} text-base"></i></button>` : '';
+
+                grid.innerHTML += `
+                        <article class="glass-card p-6 flex flex-col group">
+                            <div class="flex justify-between items-start gap-3 mb-4">
+                                <div class="flex flex-wrap gap-1.5">
+                                    <span class="badge ${isDraft ? 'badge-amber' : 'badge-blue'}">${escapeHTML(exam.status || 'PUBLISHED')}</span>
+                                    <span class="badge ${exam.visibleToStudents ? 'badge-green' : 'badge-slate'}">${exam.visibleToStudents ? 'Visible' : 'Hidden'}</span>
+                                </div>
+                                <div class="flex items-center">
+                                    ${visBtn}
+                                    ${deleteBtn}
+                                </div>
+                            </div>
+                            <h2 class="text-lg font-semibold text-slate-900 leading-snug mb-1 truncate" title="${escapeHTML(exam.title)}">${escapeHTML(exam.title) || 'Untitled Exam'}</h2>
+                            <p class="text-xs text-slate-500 mb-3">Semester ${exam.targetSemester || 'N/A'} <span class="text-slate-300 mx-1">&middot;</span> ${escapeHTML(exam.departmentName)}</p>
+                            <span class="badge badge-blue self-start mb-5">${escapeHTML(exam.subjectName || 'General')}</span>
+                            <div class="text-sm text-slate-500 space-y-2 border-t border-slate-100 pt-4 mb-5">
+                                <p class="text-xs"><i class="fa-regular fa-calendar-check w-5 text-slate-400"></i>${exam.startTime ? new Date(exam.startTime).toLocaleString() : 'Not scheduled yet'}</p>
+                                <p class="text-xs flex justify-between gap-3">
+                                    <span><i class="fa-regular fa-clock w-5 text-slate-400"></i>${exam.durationMinutes} mins</span>
+                                    <span class="text-slate-400 truncate max-w-[150px]" title="${escapeHTML(exam.createdByTeacherUsername)}"><i class="fa-solid fa-user-pen mr-1"></i>${escapeHTML(exam.createdByTeacherUsername)}</span>
+                                </p>
+                            </div>
+${isDraft
+                                ? (isCreator ? IGReview.draftButtons(exam, 'loadDashboard') : '<p class="text-xs text-slate-400 mt-auto">Draft by a colleague</p>')
+                                : `<button onclick="viewResults(${exam.id}, '${escapeHTML(exam.title)}')" class="btn btn-secondary w-full mt-auto">
+                                <i class="fa-solid fa-chart-column"></i> Analyze Performance
+                            </button>`}
+                        </article>
+                    `;
+            });
+        } catch (e) { grid.innerHTML = IGUI.empty({ error: true, icon: 'fa-plug-circle-xmark', title: 'Could Not Load Your Exams', text: 'Failed to connect to the server. Check that the backend is running.', retry: 'loadDashboard()' }); }
+    }
+
+    // --- 2. AI QUESTION GENERATION + REVIEW (shared module: ai-review.js) ---
+    async function runAI() { return IGReview.generate(); }
+    function addManualQuestion() { IGReview.addManual(); }
+    function renderPreviewList() { IGReview.render(); }
+
+    // --- 3. SAVE A DRAFT OR PUBLISH ---
+    async function saveExam(asDraft) {
+        asDraft = asDraft === true;
+        const title = document.getElementById('examTitle').value.trim();
+        const subj = document.getElementById('examSubject').value.trim();
+        const sem = document.getElementById('targetSemester').value;
+        const dur = document.getElementById('duration').value;
+        const start = document.getElementById('startTime').value;
+        const end = document.getElementById('endTime').value;
+
+        if (!title) return IGUI.toast('Give the exam a title.', 'error');
+        if (!asDraft) {
+            if (!subj || !sem || !dur || !start || !end) return IGUI.toast('Fill in the subject, semester, duration, start time and end time before publishing.', 'error');
+            if (new Date(end) <= new Date(start)) return IGUI.toast('The end time must be after the start time.', 'error');
+            if (IGReview.count() === 0) return IGUI.toast('Add at least one question before publishing.', 'error');
+        }
+
+        let questions;
+        try { questions = IGReview.exportQuestions(); } catch (err) { return IGUI.toast(err.message, 'error'); }
+        if (!asDraft && !(await IGReview.confirmPublish(title))) return;
+
+        const btn = document.getElementById(asDraft ? 'rvDraftBtn' : 'saveBtn');
+        const originalLabel = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Saving...';
+        btn.disabled = true;
+
+        const payload = {
+            title: title,
+            subjectName: subj || null,
+            targetSemester: sem ? parseInt(sem) : null,
+            durationMinutes: dur ? parseInt(dur) : 30,
+            startTime: start || null,
+            endTime: end || null,
+            departmentName: u.branchName || u.departmentName || "General",
+            questions: questions
+        };
+
+        try {
+            const url = `/api/exam/teacher/save?draft=${asDraft}` + (editingDraftId ? `&replaces=${encodeURIComponent(editingDraftId)}` : '');
+            const res = await fetch(url, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+            if (res.ok) {
+                IGUI.toast(asDraft ? 'Draft saved. Publish it from your exam list when you are ready.' : 'Exam published successfully.', 'success');
+                editingDraftId = null;
+                closeModal('createModal');
+                loadDashboard();
+            } else {
+                const text = (await res.text()).replace(/^Error:\s*/, '');
+                IGUI.toast(text && text.length < 300 ? text : 'The exam could not be saved.', 'error');
+            }
+        } catch (e) {
+            IGUI.toast('Could not reach the server. Your questions are still on screen, so try again.', 'error');
+        } finally {
+            btn.innerHTML = originalLabel;
+            btn.disabled = false;
+        }
+    }
+
+    // Reopen a saved draft in the editor
+    async function editDraft(id) {
+        try {
+            const ex = await IGReview.fetchDraft(id);
+            openModal('createModal');
+            document.getElementById('examTitle').value = ex.title || '';
+            document.getElementById('examSubject').value = ex.subjectName || '';
+            document.getElementById('targetSemester').value = ex.targetSemester || '';
+            document.getElementById('duration').value = ex.durationMinutes || 30;
+            document.getElementById('startTime').value = IGReview.toInputDateTime(ex.startTime);
+            document.getElementById('endTime').value = IGReview.toInputDateTime(ex.endTime);
+            IGReview.loadQuestions(ex.questions || []);
+            editingDraftId = id;
+            document.getElementById('createModalTitle').innerText = 'Edit draft';
+        } catch (err) { IGUI.toast(err.message, 'error'); }
+    }
+
+    async function toggleVisibility(id) {
+        try {
+            const res = await fetch(`/api/exam/teacher/${id}/toggle-visibility`, { method: 'PUT' });
+            if (!res.ok) {
+                let msg = 'Failed to update exam visibility.';
+                try { msg = (await res.json()).error || msg; } catch (e) { /* ignore */ }
+                throw new Error(msg);
+            }
+            IGUI.toast('Exam visibility updated.', 'success');
+        } catch (e) { IGUI.toast(e.message || 'Failed to update exam visibility.', 'error'); }
+        loadDashboard();
+    }
+
+    // --- 5. PERFORMANCE SHEET & SMART DIFFICULTY CALCULATOR ---
+    async function viewResults(id, title) {
+        currentViewExamId = id;
+        document.getElementById('resModalTitle').innerText = `Results: ${title}`;
+        document.getElementById('analysisResultArea').innerHTML = '';
+        openModal('resultsModal');
+        // Rows, search, sorting and error handling live in results-table.js (shared with the principal dashboard).
+        const [resData, statsData] = await Promise.all([
+            IGResults.load(id),
+            IGResults.getJson(`/api/exam/${id}/analytics`).catch(() => null)
+        ]);
+        IGExport.resultsButton('resModalTitle', resData || [], title);
+        IGAnswerRelease.mount(id);
+
+        if (currentChart) { currentChart.destroy(); currentChart = null; }
+        if (!statsData) {
+            document.getElementById('absentBadge').innerText = 'Statistics are unavailable right now.';
+            return;
+        }
+        document.getElementById('absentBadge').innerText = `${statsData.absent || 0} Students Absent`;
+        currentChart = new Chart(document.getElementById('analyticsChart').getContext('2d'), {
+            type: 'doughnut',
+            data: { labels: ['Passed', 'Failed'], datasets: [{ data: [statsData.passed || 0, statsData.failed || 0], backgroundColor: ['#10b981', '#ef4444'], borderWidth: 0 }] },
+            options: { responsive: true, cutout: '75%', plugins: { legend: { position: 'bottom' } } }
+        });
+    }
+
+    async function analyzeDifficulty() {
+        if(!currentViewExamId) return;
+        const btn = document.getElementById('analyzeBtn');
+        const area = document.getElementById('analysisResultArea');
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Analyzing...';
+        btn.disabled = true;
+
+        try {
+            const res = await fetch(`/api/exam/${currentViewExamId}/hardest-questions`);
+            const data = await res.json();
+
+            if(data.length === 0) {
+                area.innerHTML = '<p class="text-xs text-slate-400 text-center font-bold mt-2 bg-slate-100 p-3 rounded-xl border">No frequently failed questions have been recorded for this exam yet.</p>';
+                return;
+            }
+
+            let html = '<h2 class="text-xs font-bold text-slate-500 mb-2 mt-2">High-Failure Review Targets</h2>';
+            data.slice(0, 3).forEach(q => {
+                html += `
+                    <div class="bg-red-50 p-3 rounded-xl border border-red-200">
+                        <p class="font-bold text-red-900 text-xs mb-1 line-clamp-2">${escapeHTML(q[0])}</p>
+                        <p class="text-[10px] font-bold text-red-700 bg-red-100 inline-block px-2 py-0.5 rounded-full"><i class="fa-solid fa-users-slash mr-1"></i>Incorrect: ${q[1]} Student Submissions</p>
+                    </div>`;
+            });
+            area.innerHTML = html;
+        } catch(e) { area.innerHTML = '<p class="text-xs text-red-500 text-center font-bold">Failure matrix calculation broke.</p>'; }
+        finally { btn.innerHTML = '<i class="fa-solid fa-lightbulb"></i> Identify Hardest Questions'; btn.disabled = false; }
+    }
+
+    // --- 6. VAULT STORAGE & PASSWORDED DELETION FLOWS ---
+    async function loadArchives() {
+        const list = document.getElementById('archiveList');
+        list.innerHTML = '<div class="skeleton" style="height:64px"></div><div class="skeleton mt-3" style="height:64px"></div>';
+        try {
+            const res = await fetch(`/api/exam/my-archives?username=${u.email}`);
+            const data = await res.json();
+
+            list.innerHTML = data.length ? data.map(a => `
+                <div class="flex justify-between items-center gap-3 p-4 border border-slate-200 rounded-xl bg-white hover:border-brand-200 transition-colors">
+                    <div>
+                        <p class="font-bold text-slate-800 text-sm">${escapeHTML(a.examTitle)}</p>
+                        <p class="text-xs text-slate-400">Archive #${a.id}</p>
+                    </div>
+                    <button onclick="downloadArchive(${a.id})" class="btn btn-primary btn-sm shrink-0"><i class="fa-solid fa-download"></i> Download PDF</button>
+                </div>`).join('') : IGUI.empty({ icon: 'fa-box-archive', title: 'No Archived Exams', text: 'Exams you archive and delete are stored here as secure PDFs.' });
+        } catch(e) { list.innerHTML = IGUI.empty({ error: true, icon: 'fa-plug-circle-xmark', title: 'Could Not Load Archives', retry: 'loadArchives()' }); }
+    }
+
+    async function downloadArchive(id) {
+        const pwd = await IGUI.prompt({ title: 'Authorize Export', message: 'Enter your account password to download this archive.', password: true, confirmText: 'Download', icon: 'fa-lock' });
+        if(!pwd) return;
+        const res = await fetch(`/api/exam/retrieve-archive/${id}`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pwd, username: u.email })
+        });
+        if(res.ok) {
+            const blob = await res.blob();
+            const a = document.createElement('a'); a.href = window.URL.createObjectURL(blob); a.download = `ArchivedExam_${id}.pdf`; a.click();
+        } else alert("Authorization context exception: Cryptographic signature mismatch.");
+    }
+
+    function openDeleteModal(id) {
+        targetDeleteExamId = id;
+        document.getElementById('deleteErr').classList.add('hidden');
+        document.getElementById('deletePassword').value = '';
+        openModal('deleteModal');
+    }
+
+    async function confirmDelete() {
+        const pwd = document.getElementById('deletePassword').value;
+        const err = document.getElementById('deleteErr');
+        if (!pwd) {
+            err.innerText = "Verification signature required.";
+            err.classList.remove('hidden');
+            return;
+        }
+
+        try {
+            // 🚨 MATCHES THE UPDATED BACKEND PATH EXACTLY
+            const res = await fetch(`/api/exam/archive-delete/${targetDeleteExamId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    password: pwd,
+                    username: u.email
+                })
+            });
+
+            if (res.ok) {
+                closeModal('deleteModal');
+                loadDashboard(); // Refresh UI
+            } else {
+                const data = await res.json();
+                err.innerText = data.error || "Profile validation credentials incorrect.";
+                err.classList.remove('hidden');
+            }
+        } catch (e) {
+            console.error(e);
+            err.innerText = "Error: Could not reach server.";
+            err.classList.remove('hidden');
+        }
+    }
+
+    function printResults() {
+        const title = document.getElementById('resModalTitle').innerText;
+        const tableHtml = document.getElementById('printableTableArea').innerHTML;
+        const printWin = window.open('', '', 'height=600,width=800');
+        printWin.document.write('<html><head><title>Print ' + title + '</title>');
+        printWin.document.write(`
+            <style>
+                body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
+                h2 { text-align: center; border-bottom: 2px solid #ccc; padding-bottom: 10px; margin-bottom: 20px;}
+                table { width: 100%; border-collapse: collapse; }
+                th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+                th { background-color: #f8f9fa; font-weight: bold; font-size: 13px; }
+                td:nth-child(3), th:nth-child(3), td:nth-child(4), th:nth-child(4) { text-align: right; }
+            </style>
+        `);
+        printWin.document.write('</head><body><h2>IntelliGen: ' + title + '</h2>' + tableHtml + '</body></html>');
+        printWin.document.close();
+        printWin.focus();
+        setTimeout(() => { printWin.print(); printWin.close(); }, 250);
+    }
+
+    loadDashboard();
+
+    IGFilter.mount('examGrid');
+    IGReview.mount({ onSaveDraft: function () { saveExam(true); } });
+</script>
+</body>
+</html>
