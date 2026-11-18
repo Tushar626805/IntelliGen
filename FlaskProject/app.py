@@ -36,9 +36,16 @@ API_KEY = os.environ.get('IGEN_API_KEY', '')
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
 
 gemini_client = (
-    genai.Client(api_key=GEMINI_API_KEY)
+    genai.Client(
+        api_key=GEMINI_API_KEY,
+        http_options={"api_version": "v1beta"}
+    )
     if GEMINI_API_KEY else None
 )
+
+
+
+
 CHUNK_CHARS = int(os.environ.get('IGEN_CHUNK_CHARS', '5000'))
 MAX_CHUNKS = int(os.environ.get('IGEN_MAX_CHUNKS', '5'))
 MAX_QUESTIONS = 30
